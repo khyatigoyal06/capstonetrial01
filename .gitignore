@@ -1,0 +1,55 @@
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Secrets — never commit API keys
+.env
+.env.local
+.env.*.local
+
+# Local editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Keep dataset archive tracked even if a global ignore hides zip files
+!Capstone.yolov8.zip
+
+# Tobii Glasses raw exports and generated reports
+tobii_exports/
+raw_data/
+exports/
+reports/
+outputs/
+runs/
+webgazer_session*.html
+*.tsv
+*.csv
+!data/samples/sample_gaze.csv
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+.run_server_static/
+server.log
+
+# Local calibration and evaluation captures contain camera-derived gaze samples
+records/
+
+# Generated YOLO cache files
+**/labels.cache

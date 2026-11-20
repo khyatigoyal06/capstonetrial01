@@ -1,0 +1,15 @@
+services:
+  app:
+    image: ${DOCKER_IMAGE:-capstone-poster:latest}
+    ports:
+      - "80:8001"
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - MODEL_WEIGHTS=${MODEL_WEIGHTS:-/app/models/weights/best.pt}
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
