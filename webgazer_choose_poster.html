@@ -399,6 +399,93 @@
     .status-badge.recording { background: #fef2f2; color: #dc2626; animation: rec-blink 1.2s ease-in-out infinite; }
     .status-badge.stopped { background: #f1f5f9; color: #475569; }
     .status-badge.error { background: #fef2f2; color: #b91c1c; }
+    .status-badge.warning { background: #fff7ed; color: #c2410c; }
+    /* Study mode: while the gaze engine runs, the poster gets the whole screen and
+       nothing else competes for attention (no header, panel or AOI boxes). */
+    body.study-mode header, body.study-mode .stage-toolbar,
+    body.study-mode #aoiEditHint, body.study-mode .aoi { display: none !important; }
+    body.study-mode main { grid-template-columns: 1fr; padding: 0; gap: 0; }
+    body.study-mode .stage { border: 0; border-radius: 0; box-shadow: none; background: #0f172a; }
+    body.study-mode .poster-wrap { border-radius: 0; box-shadow: none; transform: none; }
+    #studyHud {
+      display: none; position: fixed; z-index: 2147483646; left: 12px; top: 10px; max-width: min(760px, 92vw);
+      flex-wrap: wrap;
+      align-items: center; gap: 10px; padding: 6px 8px 6px 14px; border-radius: 999px;
+      background: rgba(15, 23, 42, 0.72); color: #e2e8f0; font-size: 12px; line-height: 1.3;
+    }
+    body.study-mode #studyHud { display: flex; transition: opacity 150ms; }
+    /* Fade the status bar while a dot is shown so it does not pull the eye. */
+    /* While a dot is shown only the status text fades; Stop stays fully visible. */
+    body.target-active #studyHud > span { opacity: 0.25; }
+    body.target-active #studyHud { background: rgba(15, 23, 42, 0.35); }
+    #studyHudChoice { display: inline-flex; gap: 6px; opacity: 1 !important; }
+    #studyHudChoice:empty { display: none; }
+    #studyHudChoice button.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+    #studyStopBtn { font-weight: 700; }
+    #studyHud button { min-height: 28px; padding: 0 12px; font-size: 12px; }
+    #studyHudTimer { font-variant-numeric: tabular-nums; color: #fbbf24; white-space: nowrap; }
+    /* Keep the hidden camera panel rendered (off-screen), so its video keeps decoding. */
+    body.study-mode aside { display: flex !important; position: fixed; left: -10000px; top: 0; width: 340px; }
+    #studyHudDistance { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    #studyHudDistance.warn { color: #fca5a5; font-weight: 700; }
+    #positionOverlay {
+      display: none; position: fixed; inset: 0; z-index: 50; padding: 56px 24px 24px; overflow: auto;
+      align-items: center; justify-content: center; background: #0f172a; color: #e2e8f0;
+    }
+    #positionOverlay.open { display: flex; }
+    .position-card { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; width: min(1180px, 100%); align-items: center; }
+    .position-view { position: relative; overflow: hidden; border-radius: 16px; background: #000; aspect-ratio: 16 / 9; }
+    .position-view video, .position-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .position-view video { object-fit: fill; transform: scaleX(-1); }
+    .position-side h2 { margin: 0 0 6px; font-size: 20px; color: #fff; }
+    #positionHint { min-height: 52px; margin: 0 0 16px; font-size: 19px; font-weight: 700; color: #fbbf24; line-height: 1.35; }
+    #positionHint.good { color: #4ade80; }
+    .distance-readout { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 13px; color: #94a3b8; }
+    .distance-readout strong { font-size: 28px; color: #fff; font-variant-numeric: tabular-nums; }
+    .distance-meter { position: relative; height: 14px; border-radius: 99px; background: #7f1d1d; margin-bottom: 4px; }
+    .distance-meter .zone { position: absolute; top: 0; bottom: 0; background: #16a34a; }
+    .distance-meter .marker { position: absolute; top: -6px; width: 4px; height: 26px; margin-left: -2px; border-radius: 2px; background: #fff; transition: left 120ms linear; }
+    .distance-scale { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 16px; }
+    .position-checks { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+    .position-checks li::before { display: inline-block; width: 22px; font-weight: 700; }
+    .position-checks li.ok::before { content: "✓"; color: #4ade80; }
+    .position-checks li.bad::before { content: "✗"; color: #f87171; }
+    .position-actions { display: grid; gap: 8px; }
+    .position-actions button { width: 100%; }
+    .position-note { margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: #64748b; }
+    @media (max-width: 860px) { .position-card { grid-template-columns: 1fr; } }
+    #resultsOverlay {
+      display: none; position: fixed; inset: 0; z-index: 60; overflow: auto; padding: 24px;
+      background: rgba(15, 23, 42, 0.78);
+    }
+    #resultsOverlay.open { display: block; }
+    .results-card {
+      max-width: 980px; margin: 0 auto; padding: 20px; border-radius: 16px; background: #fff;
+      display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px;
+    }
+    .results-card img { width: 100%; border-radius: 8px; }
+    .results-card h2 { margin: 0 0 6px; font-size: 18px; }
+    .results-card .muted { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .results-bars { display: grid; gap: 8px; margin: 14px 0; }
+    .results-bar { display: grid; grid-template-columns: 80px 1fr 48px; gap: 8px; align-items: center; font-size: 13px; }
+    .results-bar span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .results-bar .track { height: 8px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+    .results-bar .fill { height: 100%; background: #6366f1; }
+    .results-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    @media (max-width: 760px) { .results-card { grid-template-columns: 1fr; } }
+    /* Gaze-engine targets capture automatically: a ring shrinks onto a small
+       centre point so the eye has one precise spot to hold for the dwell time. */
+    .calibration-target.auto { animation: none; }
+    .calibration-target.auto::before {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px;
+      margin: -3px 0 0 -3px; border-radius: 50%; background: #0f172a;
+    }
+    .calibration-target.auto::after {
+      content: ""; position: absolute; inset: -16px; border-radius: 50%;
+      border: 3px solid rgba(15, 23, 42, 0.55);
+      animation: target-shrink var(--dwell, 1900ms) linear forwards;
+    }
+    @keyframes target-shrink { from { transform: scale(1.7); opacity: 0.9; } to { transform: scale(0.35); opacity: 0.25; } }
     @keyframes rec-blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.65; }
@@ -490,7 +577,7 @@
     .calibration-layer {
       position: fixed;
       inset: 0;
-      z-index: 2147483647;
+      z-index: 2147483000; /* below the study bar so Stop always stays clickable */
       cursor: crosshair;
       touch-action: manipulation;
       /* Keep the live camera and poster visible while this layer captures clicks. */
@@ -588,6 +675,7 @@
         <button id="startBtn" class="primary">▶ Start</button>
         <button id="stopBtn" class="danger" disabled>■ Stop</button>
         <button id="downloadBtn" disabled>↓ CSV</button>
+        <button id="reportBtn" disabled title="Calibration and accuracy report (JSON) for benchmarking">↓ Report</button>
       </div>
     </div>
   </header>
@@ -624,11 +712,12 @@
         <h2 class="panel-title">Live Camera</h2>
         <label class="gaze-model-picker" for="gazeModelSelect">Gaze model
           <select id="gazeModelSelect" aria-label="Gaze estimation model">
-            <option value="custom" selected>Custom eye tracker · iris geometry</option>
-            <option value="pretrained">Existing MPIIFaceGaze estimator</option>
+            <option value="engine" selected>Gaze engine · ETH-XGaze + head pose (recommended)</option>
+            <option value="custom">Legacy iris geometry (low accuracy)</option>
           </select>
         </label>
-        <p class="model-note">The custom option uses the new tracker’s iris features with this page’s calibration and poster mapping. Recording stays blocked if the independent accuracy check fails.</p>
+        <p id="modelNote" class="model-note">The gaze engine runs on this app's local API, compensates for head movement, calibrates automatically while you look at each dot, measures its own accuracy on separate dots, and re-checks drift every 30 s. Recording is blocked when accuracy is poor.</p>
+        <label class="toggle-aoi"><input id="gazeDotToggle" type="checkbox"> Show live gaze dot while recording (can bias where people look)</label>
         <div id="cameraMount">
           <span id="cameraPlaceholder">Camera preview appears here after Start</span>
           <video id="cameraPreview" autoplay muted playsinline aria-label="Live webcam preview"></video>
@@ -649,10 +738,10 @@
         <ol class="steps">
           <li>Pick a gallery poster or upload your own.</li>
           <li>Review existing AOIs or choose a label and draw regions; click a region to remove it.</li>
-          <li>Choose <strong>Custom eye tracker</strong> or the existing MPIIFaceGaze estimator, then click <strong>Start</strong> and allow webcam access.</li>
-          <li>Look at each <strong>orange</strong> dot for about one second, then click it. Then do the same for the <strong>blue</strong> validation dots.</li>
-          <li>Look at the poster — recording begins automatically.</li>
-          <li>Click <strong>Stop</strong>, then <strong>Download CSV</strong> for analysis.</li>
+          <li>Click <strong>Start</strong> and allow webcam access. The page goes full screen and a camera guide shows how far to sit (45–70 cm, about arm's length) and whether you're centred; calibration begins once every check is green.</li>
+          <li>Look at the small centre of each <strong>orange</strong> dot until its ring closes — no clicking. Then do the same for the <strong>blue</strong> accuracy dots.</li>
+          <li>Look at the poster — recording begins automatically. Every 30 s a dot appears briefly; look at it.</li>
+          <li>Click <strong>Stop</strong>, then <strong>↓ CSV</strong> for analysis (and <strong>↓ Report</strong> to keep the accuracy numbers).</li>
         </ol>
       </div>
       <div class="panel tip-box">
@@ -661,6 +750,57 @@
     </aside>
   </main>
   <div id="gazeDot"></div>
+  <div id="studyHud" role="status" aria-live="polite">
+    <span id="studyHudText">Starting…</span>
+    <span id="studyHudTimer"></span>
+    <span id="studyHudDistance"></span>
+    <span id="studyHudChoice"></span>
+    <button id="studyStopBtn" class="danger" type="button" title="Stop now; everything recorded so far is kept and analysed">■ Stop &amp; see results</button>
+  </div>
+  <div id="positionOverlay" role="dialog" aria-modal="true" aria-labelledby="positionTitle">
+    <div class="position-card">
+      <div class="position-view" id="positionView">
+        <video id="positionVideo" autoplay muted playsinline></video>
+        <canvas id="positionCanvas"></canvas>
+      </div>
+      <div class="position-side">
+        <h2 id="positionTitle">Get into position</h2>
+        <p id="positionHint">Looking for your face…</p>
+        <div class="distance-readout"><span>Distance from camera</span><strong id="positionDistance">—</strong></div>
+        <div class="distance-meter"><span class="zone" id="positionZone"></span><span class="marker" id="positionMarker"></span></div>
+        <div class="distance-scale"><span>25 cm</span><span>target 45–70 cm (≈ arm's length)</span><span>100 cm</span></div>
+        <ul class="position-checks">
+          <li id="checkFace" class="bad">Face visible, eyes open</li>
+          <li id="checkDistance" class="bad">At the right distance</li>
+          <li id="checkCentre" class="bad">Centred in front of the camera</li>
+          <li id="checkFacing" class="bad">Facing the screen straight on</li>
+        </ul>
+        <div class="position-actions">
+          <button id="positionStartBtn" class="primary" type="button">Start calibration now</button>
+          <button id="positionCorrectBtn" type="button" title="Sit exactly 50 cm from the camera (measure it), then click">I'm sitting at exactly 50 cm — correct the reading</button>
+        </div>
+        <p class="position-note" id="positionNote">Calibration starts by itself once every check is green for 1.5 s. Keep this position for the whole session; the distance stays visible in the top bar.</p>
+      </div>
+    </div>
+  </div>
+  <div id="resultsOverlay" role="dialog" aria-modal="true" aria-labelledby="resultsTitle">
+    <div class="results-card">
+      <div>
+        <img id="resultsImage" alt="Gaze heatmap with numbered fixations">
+      </div>
+      <div>
+        <h2 id="resultsTitle">Where you looked</h2>
+        <p id="resultsSummary" class="muted">Analyzing…</p>
+        <div id="resultsBars" class="results-bars"></div>
+        <p id="resultsNotes" class="muted"></p>
+        <div class="results-actions">
+          <button id="resultsCsvBtn" type="button">↓ CSV</button>
+          <button id="resultsReportBtn" type="button">↓ Report</button>
+          <button id="resultsCloseBtn" class="primary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     const POSTERS = [{"name": "00927d37ab12cc24236b6f48adeff8ba_jpg.rf.ApRtohr2AOydKfDlM69X.jpg", "imageSrc": "Capstone.yolov8/train/images/00927d37ab12cc24236b6f48adeff8ba_jpg.rf.ApRtohr2AOydKfDlM69X.jpg", "width": 735, "height": 1026, "aois": [{"label": "Product", "x1": 46, "y1": 356, "x2": 692, "y2": 890}, {"label": "logo", "x1": 56, "y1": 44, "x2": 201, "y2": 119}, {"label": "Headline", "x1": 342, "y1": 66, "x2": 681, "y2": 340}, {"label": "Price", "x1": 523, "y1": 386, "x2": 665, "y2": 437}]}, {"name": "01b4bbdd3b07d48f634518ac3fdec945ff67cf541678169060_jpg.rf.Gf2oIixb8WD6QeDcJfVA.jpg", "imageSrc": "Capstone.yolov8/train/images/01b4bbdd3b07d48f634518ac3fdec945ff67cf541678169060_jpg.rf.Gf2oIixb8WD6QeDcJfVA.jpg", "width": 424, "height": 600, "aois": [{"label": "Product", "x1": 181, "y1": 360, "x2": 251, "y2": 584}, {"label": "Price", "x1": 301, "y1": 325, "x2": 367, "y2": 356}, {"label": "CTA", "x1": 34, "y1": 384, "x2": 161, "y2": 403}, {"label": "logo", "x1": 29, "y1": 508, "x2": 140, "y2": 583}]}, {"name": "0ac357186f280955e6278a4230ee95ec_jpg.rf.aS9UQ9uQEfkopUAIY5vG.jpg", "imageSrc": "Capstone.yolov8/train/images/0ac357186f280955e6278a4230ee95ec_jpg.rf.aS9UQ9uQEfkopUAIY5vG.jpg", "width": 736, "height": 920, "aois": [{"label": "logo", "x1": 44, "y1": 52, "x2": 436, "y2": 268}, {"label": "Product", "x1": 45, "y1": 278, "x2": 699, "y2": 783}, {"label": "Headline", "x1": 218, "y1": 276, "x2": 576, "y2": 780}]}, {"name": "1280w-5RSVue47gsA_webp.rf.90CeA2D6NuDwrs6tvqYo.webp", "imageSrc": "Capstone.yolov8/train/images/1280w-5RSVue47gsA_webp.rf.90CeA2D6NuDwrs6tvqYo.webp", "width": 1280, "height": 1600, "aois": [{"label": "logo", "x1": 482, "y1": 122, "x2": 1169, "y2": 178}, {"label": "Headline", "x1": 70, "y1": 262, "x2": 1196, "y2": 719}, {"label": "CTA", "x1": 132, "y1": 1460, "x2": 1155, "y2": 1546}, {"label": "Product", "x1": 87, "y1": 775, "x2": 1178, "y2": 1392}]}, {"name": "13180a19-8edc-49a0-928f-fe7d71b242f0-__CR0,0,970,600_PT0_SX970_V1____jpg.rf.LeZs6NSNh1zZFdJhfgwU.jpg", "imageSrc": "Capstone.yolov8/train/images/13180a19-8edc-49a0-928f-fe7d71b242f0-__CR0%2C0%2C970%2C600_PT0_SX970_V1____jpg.rf.LeZs6NSNh1zZFdJhfgwU.jpg", "width": 970, "height": 600, "aois": [{"label": "Headline", "x1": 158, "y1": 7, "x2": 858, "y2": 114}, {"label": "Product", "x1": 145, "y1": 138, "x2": 349, "y2": 571}, {"label": "logo", "x1": 201, "y1": 252, "x2": 304, "y2": 333}]}, {"name": "15756613ced446fb175bd0f365492aa1_jpg.rf.i8zsOBVXwTtifULBEyXh.jpg", "imageSrc": "Capstone.yolov8/train/images/15756613ced446fb175bd0f365492aa1_jpg.rf.i8zsOBVXwTtifULBEyXh.jpg", "width": 736, "height": 1308, "aois": [{"label": "Product", "x1": 152, "y1": 497, "x2": 569, "y2": 897}, {"label": "Headline", "x1": 49, "y1": 220, "x2": 539, "y2": 484}, {"label": "logo", "x1": 557, "y1": 215, "x2": 655, "y2": 308}]}, {"name": "1_IxtM_alY78hI-Cxt84TGUQ_jpg.rf.Ssr3ch9PGSnejIJtJmxk.jpg", "imageSrc": "Capstone.yolov8/train/images/1_IxtM_alY78hI-Cxt84TGUQ_jpg.rf.Ssr3ch9PGSnejIJtJmxk.jpg", "width": 480, "height": 270, "aois": [{"label": "Headline", "x1": 30, "y1": 217, "x2": 342, "y2": 270}, {"label": "logo", "x1": 343, "y1": 212, "x2": 447, "y2": 262}, {"label": "Product", "x1": 116, "y1": 23, "x2": 377, "y2": 213}]}, {"name": "2738e2020c83800948786518c0ee43e5_jpg.rf.OlPO9dUesmQlAJa62Qys.jpg", "imageSrc": "Capstone.yolov8/train/images/2738e2020c83800948786518c0ee43e5_jpg.rf.OlPO9dUesmQlAJa62Qys.jpg", "width": 1080, "height": 1080, "aois": [{"label": "Product", "x1": 40, "y1": 556, "x2": 437, "y2": 950}, {"label": "Headline", "x1": 200, "y1": 232, "x2": 920, "y2": 449}, {"label": "logo", "x1": 352, "y1": 18, "x2": 746, "y2": 197}]}, {"name": "2eda0e78f9307ac69af8c6e38c06f65b_jpg.rf.Tf5BEFix8N9JLcsAm8oz.jpg", "imageSrc": "Capstone.yolov8/train/images/2eda0e78f9307ac69af8c6e38c06f65b_jpg.rf.Tf5BEFix8N9JLcsAm8oz.jpg", "width": 1199, "height": 1692, "aois": [{"label": "Product", "x1": 56, "y1": 737, "x2": 1136, "y2": 1381}, {"label": "Headline", "x1": 56, "y1": 131, "x2": 1141, "y2": 786}, {"label": "logo", "x1": 39, "y1": 116, "x2": 360, "y2": 453}, {"label": "CTA", "x1": 869, "y1": 1168, "x2": 1128, "y2": 1538}]}, {"name": "3403f3b0f36afbd40865a50d466cba95_jpg.rf.LXwYV5gSu9Rf1ldfzZzF.jpg", "imageSrc": "Capstone.yolov8/train/images/3403f3b0f36afbd40865a50d466cba95_jpg.rf.LXwYV5gSu9Rf1ldfzZzF.jpg", "width": 900, "height": 1200, "aois": [{"label": "logo", "x1": 313, "y1": 36, "x2": 590, "y2": 191}, {"label": "Price", "x1": 410, "y1": 414, "x2": 683, "y2": 505}, {"label": "Product", "x1": 136, "y1": 495, "x2": 735, "y2": 1035}, {"label": "Headline", "x1": 186, "y1": 232, "x2": 752, "y2": 400}, {"label": "CTA", "x1": 256, "y1": 1060, "x2": 647, "y2": 1094}]}, {"name": "3549fdcc67376874481ed7cfc68ccbf9_jpg.rf.c0aUdM0XZp5TyNID7GLk.jpg", "imageSrc": "Capstone.yolov8/train/images/3549fdcc67376874481ed7cfc68ccbf9_jpg.rf.c0aUdM0XZp5TyNID7GLk.jpg", "width": 471, "height": 600, "aois": [{"label": "Headline", "x1": 88, "y1": 74, "x2": 400, "y2": 183}, {"label": "Product", "x1": 65, "y1": 243, "x2": 399, "y2": 480}]}, {"name": "360_F_1176986826_2aVqI2aZLmmWXaa1IuS1UfJ1ecQaob5R_jpg.rf.EAULrEQzRch9YHnMoXGi.jpg", "imageSrc": "Capstone.yolov8/train/images/360_F_1176986826_2aVqI2aZLmmWXaa1IuS1UfJ1ecQaob5R_jpg.rf.EAULrEQzRch9YHnMoXGi.jpg", "width": 540, "height": 360, "aois": [{"label": "Product", "x1": 223, "y1": 80, "x2": 471, "y2": 332}, {"label": "Headline", "x1": 30, "y1": 38, "x2": 162, "y2": 138}]}, {"name": "36e1cebba7b595950251c0f7ac7b777f_png.rf.jzSM7wxDo17t7NbdKdZS.png", "imageSrc": "Capstone.yolov8/train/images/36e1cebba7b595950251c0f7ac7b777f_png.rf.jzSM7wxDo17t7NbdKdZS.png", "width": 1000, "height": 1777, "aois": [{"label": "Product", "x1": 160, "y1": 883, "x2": 897, "y2": 1252}, {"label": "Price", "x1": 89, "y1": 723, "x2": 259, "y2": 884}, {"label": "Headline", "x1": 63, "y1": 240, "x2": 958, "y2": 609}, {"label": "CTA", "x1": 383, "y1": 1470, "x2": 632, "y2": 1518}]}, {"name": "3bohlbha3ctt7cwv6753zusz85yp_jpg.rf.U4A1HaxHchlbpv9v6ZWT.jpg", "imageSrc": "Capstone.yolov8/train/images/3bohlbha3ctt7cwv6753zusz85yp_jpg.rf.U4A1HaxHchlbpv9v6ZWT.jpg", "width": 904, "height": 1280, "aois": [{"label": "Product", "x1": -449, "y1": 837, "x2": 454, "y2": 1438}, {"label": "Headline", "x1": 292, "y1": 1005, "x2": 809, "y2": 1123}, {"label": "logo", "x1": 0, "y1": 10, "x2": 904, "y2": 478}, {"label": "logo", "x1": 682, "y1": 1208, "x2": 899, "y2": 1267}]}, {"name": "41ca230093d99934fd2fff3b3e73da6d_jpg.rf.gnJqM5B75G2a8mNYh2Bq.jpg", "imageSrc": "Capstone.yolov8/train/images/41ca230093d99934fd2fff3b3e73da6d_jpg.rf.gnJqM5B75G2a8mNYh2Bq.jpg", "width": 736, "height": 1094, "aois": [{"label": "Headline", "x1": -4, "y1": -153, "x2": 88, "y2": 366}, {"label": "Headline", "x1": 29, "y1": 209, "x2": 82, "y2": 1091}, {"label": "logo", "x1": 239, "y1": 884, "x2": 497, "y2": 936}, {"label": "Product", "x1": 346, "y1": -3, "x2": 997, "y2": 645}]}, {"name": "449a3e96-8d01-4056-8b1a-e8fcbc078f55_png.rf.foAyNzQfADyrOROc7ghn.png", "imageSrc": "Capstone.yolov8/train/images/449a3e96-8d01-4056-8b1a-e8fcbc078f55_png.rf.foAyNzQfADyrOROc7ghn.png", "width": 1024, "height": 1536, "aois": [{"label": "Price", "x1": 380, "y1": 964, "x2": 708, "y2": 1138}, {"label": "Headline", "x1": 33, "y1": 43, "x2": 996, "y2": 482}, {"label": "Product", "x1": 20, "y1": 323, "x2": 988, "y2": 1466}, {"label": "CTA", "x1": 713, "y1": 869, "x2": 1009, "y2": 1074}]}, {"name": "5ff33e4d8a0e6cccbc60995ccb8c56e0249c4675-1722634887_jpg.rf.9vKI0Qcz783FI6OhCekl.jpg", "imageSrc": "Capstone.yolov8/train/images/5ff33e4d8a0e6cccbc60995ccb8c56e0249c4675-1722634887_jpg.rf.9vKI0Qcz783FI6OhCekl.jpg", "width": 660, "height": 440, "aois": [{"label": "Product", "x1": 351, "y1": 179, "x2": 558, "y2": 362}, {"label": "Product", "x1": 10, "y1": 305, "x2": 319, "y2": 438}, {"label": "CTA", "x1": 388, "y1": 397, "x2": 512, "y2": 426}, {"label": "Price", "x1": 560, "y1": 162, "x2": 619, "y2": 221}, {"label": "Headline", "x1": 22, "y1": 39, "x2": 574, "y2": 140}]}, {"name": "61lY9wa-iRL-_AC_UF350,350_QL80__jpg.rf.Rg9KHGmJtIWmxhPPP9eY.jpg", "imageSrc": "Capstone.yolov8/train/images/61lY9wa-iRL-_AC_UF350%2C350_QL80__jpg.rf.Rg9KHGmJtIWmxhPPP9eY.jpg", "width": 350, "height": 299, "aois": [{"label": "Headline", "x1": 37, "y1": 34, "x2": 317, "y2": 150}, {"label": "Product", "x1": 79, "y1": 153, "x2": 269, "y2": 294}, {"label": "logo", "x1": 114, "y1": 178, "x2": 157, "y2": 207}, {"label": "logo", "x1": 196, "y1": 178, "x2": 235, "y2": 207}]}, {"name": "73959c1b7533e64894f85f9515d2631d_jpg.rf.oBR3fXtvCWBvr9zUnkw9.jpg", "imageSrc": "Capstone.yolov8/train/images/73959c1b7533e64894f85f9515d2631d_jpg.rf.oBR3fXtvCWBvr9zUnkw9.jpg", "width": 1000, "height": 1444, "aois": [{"label": "Product", "x1": 106, "y1": 155, "x2": 945, "y2": 943}, {"label": "logo", "x1": 363, "y1": 1210, "x2": 614, "y2": 1318}, {"label": "Headline", "x1": 143, "y1": 963, "x2": 716, "y2": 1207}]}, {"name": "74964262-postcard-poster-with-fast-food-tasty-and-appetizing-menu-hamburger-ketchup-carbonated-beverage_jpg.rf.CmJoJRHgkuO8FkXuHHwN.jpg", "imageSrc": "Capstone.yolov8/train/images/74964262-postcard-poster-with-fast-food-tasty-and-appetizing-menu-hamburger-ketchup-carbonated-beverage_jpg.rf.CmJoJRHgkuO8FkXuHHwN.jpg", "width": 934, "height": 1300, "aois": [{"label": "Product", "x1": 322, "y1": 607, "x2": 615, "y2": 975}, {"label": "Headline", "x1": 147, "y1": 110, "x2": 785, "y2": 344}, {"label": "Price", "x1": 422, "y1": 1047, "x2": 509, "y2": 1131}]}, {"name": "84da835b0b82860916930c9488817e40_jpg.rf.gCitqDujcWafS6a9pWpx.jpg", "imageSrc": "Capstone.yolov8/train/images/84da835b0b82860916930c9488817e40_jpg.rf.gCitqDujcWafS6a9pWpx.jpg", "width": 736, "height": 1062, "aois": [{"label": "Product", "x1": 208, "y1": 274, "x2": 534, "y2": 628}, {"label": "logo", "x1": 237, "y1": 153, "x2": 475, "y2": 238}, {"label": "CTA", "x1": 514, "y1": 1000, "x2": 704, "y2": 1040}]}, {"name": "851397ea38c0861bbbcc6b6a88b79af2_jpg.rf.TLIS1eDefTGY6Mby2Mix.jpg", "imageSrc": "Capstone.yolov8/train/images/851397ea38c0861bbbcc6b6a88b79af2_jpg.rf.TLIS1eDefTGY6Mby2Mix.jpg", "width": 720, "height": 720, "aois": [{"label": "Product", "x1": 0, "y1": 354, "x2": 432, "y2": 541}, {"label": "Headline", "x1": 24, "y1": 187, "x2": 399, "y2": 333}, {"label": "logo", "x1": 29, "y1": 37, "x2": 240, "y2": 136}]}, {"name": "8c12f139a9fe54921185f4291232a2f9_jpg.rf.U8OaO5iKoslni5jXwlZJ.jpg", "imageSrc": "Capstone.yolov8/train/images/8c12f139a9fe54921185f4291232a2f9_jpg.rf.U8OaO5iKoslni5jXwlZJ.jpg", "width": 736, "height": 831, "aois": [{"label": "logo", "x1": 378, "y1": 132, "x2": 580, "y2": 201}, {"label": "Headline", "x1": 98, "y1": 80, "x2": 640, "y2": 134}, {"label": "CTA", "x1": 101, "y1": 93, "x2": 361, "y2": 223}]}, {"name": "9c99e076-d9f8-41e3-908f-6e2521332860_png.rf.VpFoXBobf1nSLzsYuHGh.png", "imageSrc": "Capstone.yolov8/train/images/9c99e076-d9f8-41e3-908f-6e2521332860_png.rf.VpFoXBobf1nSLzsYuHGh.png", "width": 1024, "height": 1536, "aois": [{"label": "Product", "x1": 13, "y1": 217, "x2": 1009, "y2": 1383}, {"label": "CTA", "x1": 486, "y1": 1327, "x2": 750, "y2": 1386}, {"label": "Headline", "x1": 20, "y1": 17, "x2": 1004, "y2": 224}, {"label": "Price", "x1": 286, "y1": 287, "x2": 489, "y2": 445}, {"label": "Price", "x1": 600, "y1": 554, "x2": 969, "y2": 608}, {"label": "Price", "x1": 6, "y1": 680, "x2": 243, "y2": 877}]}, {"name": "9e7d4e5eef8384af0ce2f0f068834fe5_jpg.rf.JwYRouRaixGiPLWB89o9.jpg", "imageSrc": "Capstone.yolov8/train/images/9e7d4e5eef8384af0ce2f0f068834fe5_jpg.rf.JwYRouRaixGiPLWB89o9.jpg", "width": 736, "height": 736, "aois": [{"label": "Product", "x1": 248, "y1": 475, "x2": 481, "y2": 683}, {"label": "Product", "x1": 275, "y1": 83, "x2": 501, "y2": 296}, {"label": "logo", "x1": 25, "y1": 16, "x2": 161, "y2": 76}, {"label": "CTA", "x1": 62, "y1": 674, "x2": 208, "y2": 698}, {"label": "Headline", "x1": 117, "y1": 319, "x2": 654, "y2": 467}]}, {"name": "Brown Coffee Promo Poster_png.rf.KTKJBVQz0fannjyQRbLG.png", "imageSrc": "Capstone.yolov8/train/images/Brown%20Coffee%20Promo%20Poster_png.rf.KTKJBVQz0fannjyQRbLG.png", "width": 1587, "height": 2245, "aois": [{"label": "Product", "x1": 132, "y1": 131, "x2": 879, "y2": 614}, {"label": "Headline", "x1": 560, "y1": 1265, "x2": 1459, "y2": 1805}, {"label": "CTA", "x1": 850, "y1": 1836, "x2": 1299, "y2": 1945}, {"label": "Price", "x1": 220, "y1": 831, "x2": 615, "y2": 1094}]}, {"name": "CYGp_ZbUMAAF3K6_png.rf.vkQZ0Wh4QAAsIK2wAiLa.png", "imageSrc": "Capstone.yolov8/train/images/CYGp_ZbUMAAF3K6_png.rf.vkQZ0Wh4QAAsIK2wAiLa.png", "width": 800, "height": 800, "aois": [{"label": "Headline", "x1": 1, "y1": 0, "x2": 799, "y2": 168}, {"label": "Product", "x1": 3, "y1": 173, "x2": 797, "y2": 797}, {"label": "logo", "x1": 164, "y1": 127, "x2": 495, "y2": 632}, {"label": "logo", "x1": 561, "y1": 590, "x2": 781, "y2": 786}]}, {"name": "GWT5uclXkAEU3PD_jpg.rf.C45uEyyPitkrGe0LIxgk.jpg", "imageSrc": "Capstone.yolov8/train/images/GWT5uclXkAEU3PD_jpg.rf.C45uEyyPitkrGe0LIxgk.jpg", "width": 960, "height": 1200, "aois": [{"label": "Product", "x1": 0, "y1": 485, "x2": 404, "y2": 981}, {"label": "Product", "x1": 600, "y1": 470, "x2": 957, "y2": 1111}, {"label": "Product", "x1": 149, "y1": 893, "x2": 582, "y2": 1170}, {"label": "logo", "x1": 9, "y1": 12, "x2": 261, "y2": 140}, {"label": "Headline", "x1": 197, "y1": 140, "x2": 780, "y2": 258}, {"label": "CTA", "x1": 207, "y1": 267, "x2": 808, "y2": 468}, {"label": "Price", "x1": 372, "y1": 460, "x2": 598, "y2": 532}]}, {"name": "Gold Brown and White Modern Culinary Festival Poster_png.rf.PhO7MdCYpvBgiFRYxGMp.png", "imageSrc": "Capstone.yolov8/train/images/Gold%20Brown%20and%20White%20Modern%20Culinary%20Festival%20Poster_png.rf.PhO7MdCYpvBgiFRYxGMp.png", "width": 1587, "height": 2245, "aois": [{"label": "Headline", "x1": 115, "y1": 131, "x2": 1447, "y2": 670}, {"label": "Product", "x1": 137, "y1": 716, "x2": 721, "y2": 1852}, {"label": "CTA", "x1": 124, "y1": 1925, "x2": 746, "y2": 2093}]}, {"name": "Green and Beige Minimalist Food Promotion Poster_png.rf.f6FtwAJGpwhv6sV7tKnB.png", "imageSrc": "Capstone.yolov8/train/images/Green%20and%20Beige%20Minimalist%20Food%20Promotion%20Poster_png.rf.f6FtwAJGpwhv6sV7tKnB.png", "width": 1587, "height": 2245, "aois": [{"label": "Headline", "x1": 214, "y1": 151, "x2": 1379, "y2": 498}, {"label": "Product", "x1": 195, "y1": 851, "x2": 1431, "y2": 1685}, {"label": "Price", "x1": 182, "y1": 1511, "x2": 567, "y2": 1621}, {"label": "CTA", "x1": 565, "y1": 1840, "x2": 1003, "y2": 1933}]}, {"name": "Green and White Photo-centric Food & Beverage Small Business Instagram Story_png.rf.NHGdlfjKAVFtGm3NYCPa.png", "imageSrc": "Capstone.yolov8/train/images/Green%20and%20White%20Photo-centric%20Food%20%26%20Beverage%20Small%20Business%20Instagram%20Story_png.rf.NHGdlfjKAVFtGm3NYCPa.png", "width": 1080, "height": 1920, "aois": [{"label": "Product", "x1": 86, "y1": 80, "x2": 1079, "y2": 1107}, {"label": "Headline", "x1": 166, "y1": 1146, "x2": 939, "y2": 1510}, {"label": "Price", "x1": 803, "y1": 1553, "x2": 1006, "y2": 1718}]}, {"name": "Kunafa-chocolate-Combo-Offer-_Special-independence-day-offer_-Choco-Palace-220824375-jpg_webp.rf.gtyAlv4X0iqflluCrOEq.webp", "imageSrc": "Capstone.yolov8/train/images/Kunafa-chocolate-Combo-Offer-_Special-independence-day-offer_-Choco-Palace-220824375-jpg_webp.rf.gtyAlv4X0iqflluCrOEq.webp", "width": 1000, "height": 1000, "aois": [{"label": "Headline", "x1": 370, "y1": 10, "x2": 647, "y2": 111}, {"label": "Price", "x1": 726, "y1": 48, "x2": 975, "y2": 221}, {"label": "Headline", "x1": 218, "y1": 866, "x2": 798, "y2": 999}, {"label": "Product", "x1": 248, "y1": 327, "x2": 747, "y2": 858}, {"label": "logo", "x1": 416, "y1": 685, "x2": 544, "y2": 798}]}, {"name": "Orange And Yellow Juice Promo Poster_png.rf.K6YsqpjU16ZByYR6Ccn9.png", "imageSrc": "Capstone.yolov8/train/images/Orange%20And%20Yellow%20Juice%20Promo%20Poster_png.rf.K6YsqpjU16ZByYR6Ccn9.png", "width": 1587, "height": 2245, "aois": [{"label": "Product", "x1": 390, "y1": 920, "x2": 1055, "y2": 1709}, {"label": "Price", "x1": 425, "y1": 1845, "x2": 1135, "y2": 1969}, {"label": "CTA", "x1": 1055, "y1": 941, "x2": 1259, "y2": 1126}, {"label": "Headline", "x1": 330, "y1": 216, "x2": 1219, "y2": 702}]}, {"name": "Restaurant deals flyer with offers_png.rf.FsrWeq2c7pH4xi4RLH4r.png", "imageSrc": "Capstone.yolov8/train/images/Restaurant%20deals%20flyer%20with%20offers_png.rf.FsrWeq2c7pH4xi4RLH4r.png", "width": 1024, "height": 1536, "aois": [{"label": "Headline", "x1": 39, "y1": 70, "x2": 958, "y2": 163}, {"label": "Price", "x1": 320, "y1": 304, "x2": 673, "y2": 373}, {"label": "Price", "x1": 303, "y1": 524, "x2": 689, "y2": 586}, {"label": "Price", "x1": 166, "y1": 680, "x2": 835, "y2": 733}, {"label": "Price", "x1": 316, "y1": 878, "x2": 670, "y2": 1058}, {"label": "CTA", "x1": 300, "y1": 1203, "x2": 697, "y2": 1253}, {"label": "CTA", "x1": 260, "y1": 1290, "x2": 737, "y2": 1332}]}, {"name": "Screenshot 2026-03-25 011429_png.rf.yzEVOpfexiNAwfFUleg7.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-03-25%20011429_png.rf.yzEVOpfexiNAwfFUleg7.png", "width": 301, "height": 421, "aois": [{"label": "Product", "x1": 75, "y1": 136, "x2": 240, "y2": 295}, {"label": "logo", "x1": 44, "y1": 55, "x2": 104, "y2": 125}, {"label": "Headline", "x1": 114, "y1": 59, "x2": 256, "y2": 160}, {"label": "CTA", "x1": 113, "y1": 25, "x2": 148, "y2": 34}, {"label": "CTA", "x1": 47, "y1": 381, "x2": 114, "y2": 392}]}, {"name": "Screenshot 2026-03-25 012329_png.rf.BCtRIBsqUGbOdv2kqsMq.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-03-25%20012329_png.rf.BCtRIBsqUGbOdv2kqsMq.png", "width": 311, "height": 453, "aois": [{"label": "Product", "x1": 14, "y1": 212, "x2": 287, "y2": 308}, {"label": "Headline", "x1": 20, "y1": 122, "x2": 292, "y2": 197}, {"label": "logo", "x1": 39, "y1": 12, "x2": 271, "y2": 80}]}, {"name": "Screenshot 2026-03-25 012341_png.rf.gLNLibhBx2u9vEPVDSLi.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-03-25%20012341_png.rf.gLNLibhBx2u9vEPVDSLi.png", "width": 304, "height": 453, "aois": [{"label": "Headline", "x1": 18, "y1": 24, "x2": 279, "y2": 95}, {"label": "Product", "x1": 166, "y1": 349, "x2": 299, "y2": 430}]}, {"name": "Screenshot 2026-03-25 012352_png.rf.cnbzOjfp5enHconr7Kxx.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-03-25%20012352_png.rf.cnbzOjfp5enHconr7Kxx.png", "width": 300, "height": 457, "aois": [{"label": "Product", "x1": 22, "y1": 130, "x2": 283, "y2": 361}, {"label": "Headline", "x1": 17, "y1": 22, "x2": 285, "y2": 88}, {"label": "Price", "x1": 11, "y1": 331, "x2": 80, "y2": 364}, {"label": "CTA", "x1": 12, "y1": 379, "x2": 290, "y2": 423}]}, {"name": "Screenshot 2026-03-25 012403_png.rf.DbQPcXCxXESUWJ8eNmTI.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-03-25%20012403_png.rf.DbQPcXCxXESUWJ8eNmTI.png", "width": 300, "height": 449, "aois": [{"label": "Price", "x1": 188, "y1": 148, "x2": 254, "y2": 196}, {"label": "Product", "x1": 46, "y1": 175, "x2": 252, "y2": 341}, {"label": "Headline", "x1": 24, "y1": 66, "x2": 277, "y2": 120}, {"label": "logo", "x1": 37, "y1": 27, "x2": 268, "y2": 57}, {"label": "logo", "x1": 36, "y1": 392, "x2": 265, "y2": 415}]}, {"name": "Screenshot 2026-05-08 011943_png.rf.4QZPrW1MLq4yrGqS2UEM.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-05-08%20011943_png.rf.4QZPrW1MLq4yrGqS2UEM.png", "width": 502, "height": 587, "aois": [{"label": "logo", "x1": 26, "y1": 24, "x2": 168, "y2": 102}, {"label": "Product", "x1": 0, "y1": 175, "x2": 286, "y2": 422}, {"label": "Product", "x1": 264, "y1": 330, "x2": 501, "y2": 587}, {"label": "Headline", "x1": 68, "y1": -43, "x2": 331, "y2": 291}]}, {"name": "Screenshot 2026-05-08 012058_png.rf.AjTTUNrIVikCJAt6LdcX.png", "imageSrc": "Capstone.yolov8/train/images/Screenshot%202026-05-08%20012058_png.rf.AjTTUNrIVikCJAt6LdcX.png", "width": 867, "height": 626, "aois": [{"label": "logo", "x1": 123, "y1": 2, "x2": 227, "y2": 101}, {"label": "Headline", "x1": 316, "y1": 45, "x2": 557, "y2": 127}, {"label": "CTA", "x1": 209, "y1": 157, "x2": 679, "y2": 233}, {"label": "Product", "x1": 188, "y1": 234, "x2": 722, "y2": 566}]}, {"name": "Summer Refreshing Beverage Social Media Poster_png.rf.IBv2hWu7hZLetIN13eDg.png", "imageSrc": "Capstone.yolov8/train/images/Summer%20Refreshing%20Beverage%20Social%20Media%20Poster_png.rf.IBv2hWu7hZLetIN13eDg.png", "width": 1414, "height": 2000, "aois": [{"label": "Product", "x1": 329, "y1": 611, "x2": 1101, "y2": 1713}, {"label": "Price", "x1": 330, "y1": 96, "x2": 1033, "y2": 554}, {"label": "Headline", "x1": 400, "y1": 545, "x2": 977, "y2": 610}, {"label": "logo", "x1": 613, "y1": 1201, "x2": 845, "y2": 1441}]}, {"name": "Taste the best food and drinks!_png.rf.Fc4RvU7OD8fKfnkssWAd.png", "imageSrc": "Capstone.yolov8/train/images/Taste%20the%20best%20food%20and%20drinks%21_png.rf.Fc4RvU7OD8fKfnkssWAd.png", "width": 1024, "height": 1536, "aois": [{"label": "Product", "x1": 46, "y1": 247, "x2": 1023, "y2": 1319}, {"label": "Price", "x1": 23, "y1": 477, "x2": 249, "y2": 661}, {"label": "Price", "x1": 6, "y1": 890, "x2": 251, "y2": 1045}, {"label": "Price", "x1": 536, "y1": 523, "x2": 766, "y2": 752}, {"label": "Headline", "x1": 123, "y1": 45, "x2": 906, "y2": 220}, {"label": "CTA", "x1": 266, "y1": 1360, "x2": 467, "y2": 1415}]}, {"name": "The Burger Company_jpg.rf.9UxbHYkAlxGnGNWnlW6l.jpg", "imageSrc": "Capstone.yolov8/train/images/The%20Burger%20Company_jpg.rf.9UxbHYkAlxGnGNWnlW6l.jpg", "width": 1511, "height": 608, "aois": [{"label": "Product", "x1": 77, "y1": 194, "x2": 631, "y2": 586}, {"label": "logo", "x1": 40, "y1": 12, "x2": 238, "y2": 201}, {"label": "Headline", "x1": 619, "y1": 24, "x2": 1426, "y2": 451}]}, {"name": "White Yellow Minimalist Beverage Happy Hour Promotion Poster_png.rf.lUXl8zbP6Bgd25vA1o9t.png", "imageSrc": "Capstone.yolov8/train/images/White%20Yellow%20Minimalist%20Beverage%20Happy%20Hour%20Promotion%20Poster_png.rf.lUXl8zbP6Bgd25vA1o9t.png", "width": 1587, "height": 2245, "aois": [{"label": "Product", "x1": 383, "y1": 642, "x2": 1305, "y2": 2086}, {"label": "CTA", "x1": 85, "y1": 1111, "x2": 727, "y2": 1461}, {"label": "Headline", "x1": 40, "y1": 156, "x2": 1523, "y2": 574}]}, {"name": "a151d5fd2de4b0187d7dfc5cf99a9157_jpg.rf.2yw0UxfBHrC14bQg5wwf.jpg", "imageSrc": "Capstone.yolov8/train/images/a151d5fd2de4b0187d7dfc5cf99a9157_jpg.rf.2yw0UxfBHrC14bQg5wwf.jpg", "width": 236, "height": 419, "aois": [{"label": "logo", "x1": 89, "y1": 24, "x2": 149, "y2": 49}, {"label": "Headline", "x1": 46, "y1": 62, "x2": 194, "y2": 122}, {"label": "Product", "x1": 70, "y1": 114, "x2": 161, "y2": 332}, {"label": "CTA", "x1": 45, "y1": 385, "x2": 190, "y2": 395}]}, {"name": "a8cbe63266b1c7a1559654c9c85ab563_jpg.rf.4uzT7dyBeNcNoYYJuTHO.jpg", "imageSrc": "Capstone.yolov8/train/images/a8cbe63266b1c7a1559654c9c85ab563_jpg.rf.4uzT7dyBeNcNoYYJuTHO.jpg", "width": 600, "height": 849, "aois": [{"label": "Headline", "x1": 114, "y1": 247, "x2": 500, "y2": 526}, {"label": "logo", "x1": 226, "y1": 657, "x2": 379, "y2": 809}]}, {"name": "acc6390e27a1753df7ad334f9ae2c034_jpg.rf.3DmEyBDnU0SwUd7hZFac.jpg", "imageSrc": "Capstone.yolov8/train/images/acc6390e27a1753df7ad334f9ae2c034_jpg.rf.3DmEyBDnU0SwUd7hZFac.jpg", "width": 736, "height": 1104, "aois": [{"label": "Product", "x1": 112, "y1": 428, "x2": 641, "y2": 777}, {"label": "Headline", "x1": 85, "y1": 190, "x2": 651, "y2": 311}]}, {"name": "authentic-mexican-street-food-event-flyer-template-9alm4u0f681e26_jpg.rf.zgevTBKMRFPlxo3oHL9O.jpg", "imageSrc": "Capstone.yolov8/train/images/authentic-mexican-street-food-event-flyer-template-9alm4u0f681e26_jpg.rf.zgevTBKMRFPlxo3oHL9O.jpg", "width": 650, "height": 800, "aois": [{"label": "Headline", "x1": 118, "y1": 562, "x2": 541, "y2": 629}, {"label": "logo", "x1": 61, "y1": 47, "x2": 610, "y2": 152}, {"label": "CTA", "x1": 166, "y1": 490, "x2": 479, "y2": 519}, {"label": "Product", "x1": 148, "y1": 215, "x2": 433, "y2": 382}]}, {"name": "beverage-2022562740-qhojap57_avif.rf.DYQetrMaVp7ehwlKRTw1.avif", "imageSrc": "Capstone.yolov8/train/images/beverage-2022562740-qhojap57_avif.rf.DYQetrMaVp7ehwlKRTw1.avif", "width": 249, "height": 360, "aois": [{"label": "Headline", "x1": 27, "y1": 32, "x2": 124, "y2": 83}, {"label": "Product", "x1": 134, "y1": 95, "x2": 205, "y2": 299}, {"label": "logo", "x1": 145, "y1": 24, "x2": 227, "y2": 76}]}, {"name": "cb587bdf0840d17819a80839c704a406_jpg.rf.cE8AfqMYYYsduhaQSMaE.jpg", "imageSrc": "Capstone.yolov8/train/images/cb587bdf0840d17819a80839c704a406_jpg.rf.cE8AfqMYYYsduhaQSMaE.jpg", "width": 736, "height": 920, "aois": [{"label": "logo", "x1": 220, "y1": 26, "x2": 524, "y2": 184}, {"label": "Headline", "x1": 128, "y1": 183, "x2": 595, "y2": 307}, {"label": "Product", "x1": 25, "y1": 331, "x2": 706, "y2": 743}]}, {"name": "daaa7bbe564f83cb48578ded546e8d0f_jpg.rf.6eiWXfcMnX2pcJMYyq7h.jpg", "imageSrc": "Capstone.yolov8/train/images/daaa7bbe564f83cb48578ded546e8d0f_jpg.rf.6eiWXfcMnX2pcJMYyq7h.jpg", "width": 1080, "height": 1920, "aois": [{"label": "Price", "x1": 164, "y1": 587, "x2": 460, "y2": 670}, {"label": "Price", "x1": 506, "y1": 1162, "x2": 791, "y2": 1249}, {"label": "Headline", "x1": 122, "y1": 119, "x2": 619, "y2": 345}, {"label": "Product", "x1": 128, "y1": 350, "x2": 989, "y2": 1830}]}, {"name": "doner-and-gyros-gtb-nagar-delhi-lebanese-delivery-restaurants-istq3k3-jpg_avif.rf.OXQGBwhRnmV1AxMYqTzb.avif", "imageSrc": "Capstone.yolov8/train/images/doner-and-gyros-gtb-nagar-delhi-lebanese-delivery-restaurants-istq3k3-jpg_avif.rf.OXQGBwhRnmV1AxMYqTzb.avif", "width": 1920, "height": 1080, "aois": [{"label": "Price", "x1": 106, "y1": 865, "x2": 1834, "y2": 1018}, {"label": "Product", "x1": 61, "y1": 533, "x2": 1835, "y2": 842}, {"label": "logo", "x1": 206, "y1": 48, "x2": 1760, "y2": 222}]}, {"name": "dunkin-600_jpg.rf.3I3QBflgi8iv9cGyO0yo.jpg", "imageSrc": "Capstone.yolov8/train/images/dunkin-600_jpg.rf.3I3QBflgi8iv9cGyO0yo.jpg", "width": 560, "height": 540, "aois": [{"label": "Product", "x1": 102, "y1": 30, "x2": 449, "y2": 381}, {"label": "logo", "x1": 112, "y1": 20, "x2": 380, "y2": 335}, {"label": "logo", "x1": 164, "y1": 23, "x2": 526, "y2": 303}, {"label": "logo", "x1": 66, "y1": 30, "x2": 238, "y2": 289}, {"label": "Headline", "x1": 103, "y1": 380, "x2": 461, "y2": 530}]}, {"name": "e54ef2b3cd127581edc7e6e16a323e53_jpg.rf.JWzYRlrljK5mdsbuoKF4.jpg", "imageSrc": "Capstone.yolov8/train/images/e54ef2b3cd127581edc7e6e16a323e53_jpg.rf.JWzYRlrljK5mdsbuoKF4.jpg", "width": 1000, "height": 1250, "aois": [{"label": "logo", "x1": 639, "y1": 8, "x2": 984, "y2": 129}, {"label": "Headline", "x1": 444, "y1": 153, "x2": 977, "y2": 422}, {"label": "Product", "x1": 64, "y1": 542, "x2": 979, "y2": 957}]}, {"name": "eda69b17e43ef0e98e91be5f3e42c3d4df593bf51678173353_jpg.rf.S4hi97FV1DQDxdwa1eCN.jpg", "imageSrc": "Capstone.yolov8/train/images/eda69b17e43ef0e98e91be5f3e42c3d4df593bf51678173353_jpg.rf.S4hi97FV1DQDxdwa1eCN.jpg", "width": 424, "height": 600, "aois": [{"label": "CTA", "x1": 20, "y1": 483, "x2": 134, "y2": 503}, {"label": "Price", "x1": 326, "y1": 210, "x2": 378, "y2": 255}, {"label": "Product", "x1": 143, "y1": 166, "x2": 327, "y2": 483}, {"label": "logo", "x1": 102, "y1": 36, "x2": 283, "y2": 117}]}, {"name": "f48785297dd83fa1bae45bb0ad8dd0e4_jpg.rf.GGndQIkybbQQXPs9XY5w.jpg", "imageSrc": "Capstone.yolov8/train/images/f48785297dd83fa1bae45bb0ad8dd0e4_jpg.rf.GGndQIkybbQQXPs9XY5w.jpg", "width": 736, "height": 1308, "aois": [{"label": "Product", "x1": 72, "y1": 312, "x2": 331, "y2": 552}, {"label": "Product", "x1": 417, "y1": 558, "x2": 651, "y2": 759}, {"label": "Product", "x1": 87, "y1": 825, "x2": 331, "y2": 1017}, {"label": "Product", "x1": 412, "y1": 1048, "x2": 657, "y2": 1209}, {"label": "Headline", "x1": 95, "y1": 128, "x2": 637, "y2": 222}, {"label": "logo", "x1": 325, "y1": 35, "x2": 407, "y2": 112}]}, {"name": "f7b898842ab1032fe10b75a94dc0fb23-w3000-h1500-_CR0,0,3000,1500__jpg.rf.9bmqWiqTQ0UqiJKaNV9S.jpg", "imageSrc": "Capstone.yolov8/train/images/f7b898842ab1032fe10b75a94dc0fb23-w3000-h1500-_CR0%2C0%2C3000%2C1500__jpg.rf.9bmqWiqTQ0UqiJKaNV9S.jpg", "width": 3000, "height": 1500, "aois": [{"label": "Headline", "x1": 195, "y1": 237, "x2": 584, "y2": 1437}, {"label": "logo", "x1": 493, "y1": 354, "x2": 970, "y2": 747}, {"label": "Product", "x1": 1746, "y1": 44, "x2": 2322, "y2": 512}]}, {"name": "f7e58caf589ae73a361ca08e28b6f3602030bf31-1722634913_jpg.rf.X0ZeUv3g2YN2LA0NSC1F.jpg", "imageSrc": "Capstone.yolov8/train/images/f7e58caf589ae73a361ca08e28b6f3602030bf31-1722634913_jpg.rf.X0ZeUv3g2YN2LA0NSC1F.jpg", "width": 660, "height": 440, "aois": [{"label": "Headline", "x1": 49, "y1": 19, "x2": 292, "y2": 68}, {"label": "Product", "x1": 101, "y1": 92, "x2": 234, "y2": 382}, {"label": "Product", "x1": 340, "y1": 209, "x2": 634, "y2": 391}]}, {"name": "food-menu-restaurant-flyer-template_106176-880_avif.rf.iGSjEY8HvmM8QqzAAtZg.avif", "imageSrc": "Capstone.yolov8/train/images/food-menu-restaurant-flyer-template_106176-880_avif.rf.iGSjEY8HvmM8QqzAAtZg.avif", "width": 360, "height": 488, "aois": [{"label": "Product", "x1": 72, "y1": 193, "x2": 268, "y2": 294}, {"label": "Headline", "x1": 87, "y1": 99, "x2": 272, "y2": 172}, {"label": "Price", "x1": 261, "y1": 186, "x2": 301, "y2": 237}, {"label": "CTA", "x1": 157, "y1": 347, "x2": 212, "y2": 365}, {"label": "logo", "x1": 49, "y1": 54, "x2": 114, "y2": 69}]}, {"name": "gpciop7135uscr370dsalum0i54l_png.rf.ngFaK4A36soiKszG67ae.png", "imageSrc": "Capstone.yolov8/train/images/gpciop7135uscr370dsalum0i54l_png.rf.ngFaK4A36soiKszG67ae.png", "width": 856, "height": 858, "aois": [{"label": "Headline", "x1": 543, "y1": 190, "x2": 827, "y2": 464}, {"label": "Product", "x1": 138, "y1": 222, "x2": 514, "y2": 640}, {"label": "Product", "x1": 543, "y1": 471, "x2": 840, "y2": 856}, {"label": "logo", "x1": 571, "y1": 638, "x2": 828, "y2": 821}]}, {"name": "images (1)_jpg.rf.GxEBuJCjr3vy05TYYyaQ.jpg", "imageSrc": "Capstone.yolov8/train/images/images%20%281%29_jpg.rf.GxEBuJCjr3vy05TYYyaQ.jpg", "width": 201, "height": 251, "aois": [{"label": "Product", "x1": 35, "y1": 91, "x2": 104, "y2": 182}, {"label": "Product", "x1": 116, "y1": 24, "x2": 190, "y2": 123}, {"label": "logo", "x1": 72, "y1": 24, "x2": 119, "y2": 76}]}, {"name": "images (3)_jpg.rf.wmzfKfRqu8WEbz7oFWHQ.jpg", "imageSrc": "Capstone.yolov8/train/images/images%20%283%29_jpg.rf.wmzfKfRqu8WEbz7oFWHQ.jpg", "width": 357, "height": 141, "aois": [{"label": "Product", "x1": 21, "y1": 16, "x2": 158, "y2": 138}, {"label": "logo", "x1": 71, "y1": 69, "x2": 111, "y2": 112}, {"label": "Headline", "x1": 188, "y1": 12, "x2": 344, "y2": 124}]}, {"name": "images_jpg.rf.EkKQtaovCRqu31IaCpGp.jpg", "imageSrc": "Capstone.yolov8/train/images/images_jpg.rf.EkKQtaovCRqu31IaCpGp.jpg", "width": 201, "height": 251, "aois": [{"label": "Product", "x1": 66, "y1": 68, "x2": 147, "y2": 235}, {"label": "CTA", "x1": 86, "y1": 240, "x2": 119, "y2": 247}, {"label": "Price", "x1": 8, "y1": 108, "x2": 41, "y2": 135}, {"label": "Headline", "x1": 15, "y1": 5, "x2": 181, "y2": 81}]}, {"name": "indian-cuisine-design-template-7966c3a4197f16f7d5a8f97f3bf263f5_screen_jpg.rf.SLzFQxYZHJ27Tu1mDX6G.jpg", "imageSrc": "Capstone.yolov8/train/images/indian-cuisine-design-template-7966c3a4197f16f7d5a8f97f3bf263f5_screen_jpg.rf.SLzFQxYZHJ27Tu1mDX6G.jpg", "width": 691, "height": 691, "aois": [{"label": "CTA", "x1": 496, "y1": 26, "x2": 603, "y2": 177}, {"label": "Product", "x1": 168, "y1": 93, "x2": 593, "y2": 335}, {"label": "Headline", "x1": 152, "y1": 367, "x2": 543, "y2": 506}]}, {"name": "page0_jpg.rf.bcALpjEDPM9aZPVVRZJy.jpg", "imageSrc": "Capstone.yolov8/train/images/page0_jpg.rf.bcALpjEDPM9aZPVVRZJy.jpg", "width": 299, "height": 424, "aois": [{"label": "Product", "x1": 7, "y1": 174, "x2": 163, "y2": 316}, {"label": "Price", "x1": 193, "y1": 194, "x2": 246, "y2": 227}, {"label": "Headline", "x1": 65, "y1": 31, "x2": 236, "y2": 49}]}, {"name": "pepsico-india-lays-love-to-love-it-1200_jpg.rf.EqRaQ1VctrMV6HYlYAnC.jpg", "imageSrc": "Capstone.yolov8/train/images/pepsico-india-lays-love-to-love-it-1200_jpg.rf.EqRaQ1VctrMV6HYlYAnC.jpg", "width": 1200, "height": 743, "aois": [{"label": "Product", "x1": 241, "y1": 0, "x2": 902, "y2": 742}, {"label": "logo", "x1": 947, "y1": 23, "x2": 1175, "y2": 220}, {"label": "logo", "x1": 415, "y1": 250, "x2": 632, "y2": 428}, {"label": "Headline", "x1": 872, "y1": 238, "x2": 1200, "y2": 501}]}, {"name": "realistic-banana-poster-fruit-juice-advertising-banner-glass-bottle-with-sweet-drink-brand-text-tasty-tropical-beverage-whole-and-cut-raw-food-2JBDDPE_jpg.rf.YKa65K9VlvslK8mby3Vf.jpg", "imageSrc": "Capstone.yolov8/train/images/realistic-banana-poster-fruit-juice-advertising-banner-glass-bottle-with-sweet-drink-brand-text-tasty-tropical-beverage-whole-and-cut-raw-food-2JBDDPE_jpg.rf.YKa65K9VlvslK8mby3Vf.jpg", "width": 1300, "height": 761, "aois": [{"label": "Product", "x1": 635, "y1": 78, "x2": 1069, "y2": 624}, {"label": "Headline", "x1": 77, "y1": 80, "x2": 534, "y2": 258}]}, {"name": "refreshment-drink-or-juice-retro-advertisement-poster-for-fast-food-restaurant-or-cinema-bistro-menu-vector-vintage-design-of-cold-soda-or-milkshake-2EHKAP0_jpg.rf.vIVW1KWBesse5RM4nCG6.jpg", "imageSrc": "Capstone.yolov8/train/images/refreshment-drink-or-juice-retro-advertisement-poster-for-fast-food-restaurant-or-cinema-bistro-menu-vector-vintage-design-of-cold-soda-or-milkshake-2EHKAP0_jpg.rf.vIVW1KWBesse5RM4nCG6.jpg", "width": 644, "height": 1390, "aois": [{"label": "Product", "x1": 195, "y1": 332, "x2": 488, "y2": 873}, {"label": "Headline", "x1": 87, "y1": 194, "x2": 569, "y2": 335}, {"label": "Price", "x1": 455, "y1": 1087, "x2": 565, "y2": 1230}]}, {"name": "starbucks_jpg.rf.u5FMT6nILpafoU2ak5Qp.jpg", "imageSrc": "Capstone.yolov8/train/images/starbucks_jpg.rf.u5FMT6nILpafoU2ak5Qp.jpg", "width": 2400, "height": 1650, "aois": [{"label": "Headline", "x1": 833, "y1": 597, "x2": 2198, "y2": 1087}, {"label": "logo", "x1": 346, "y1": 664, "x2": 766, "y2": 1890}, {"label": "Product", "x1": 130, "y1": 517, "x2": 788, "y2": 1564}]}, {"name": "tub3569x6h681knt8y0yetwvxccw_jpg.rf.WWPe6QCPnoZXFsLGWPG7.jpg", "imageSrc": "Capstone.yolov8/train/images/tub3569x6h681knt8y0yetwvxccw_jpg.rf.WWPe6QCPnoZXFsLGWPG7.jpg", "width": 1555, "height": 2200, "aois": [{"label": "Headline", "x1": 142, "y1": 338, "x2": 1455, "y2": 675}, {"label": "Product", "x1": 191, "y1": 691, "x2": 1418, "y2": 1790}, {"label": "logo", "x1": 664, "y1": 42, "x2": 835, "y2": 209}, {"label": "logo", "x1": 572, "y1": 910, "x2": 970, "y2": 1679}, {"label": "logo", "x1": 249, "y1": 925, "x2": 550, "y2": 1381}, {"label": "logo", "x1": 986, "y1": 906, "x2": 1302, "y2": 1437}]}, {"name": "unnamed_jpg.rf.amoj7NUm445za11WilVN.jpg", "imageSrc": "Capstone.yolov8/train/images/unnamed_jpg.rf.amoj7NUm445za11WilVN.jpg", "width": 1024, "height": 559, "aois": [{"label": "logo", "x1": 44, "y1": 23, "x2": 986, "y2": 138}, {"label": "Headline", "x1": 58, "y1": 148, "x2": 979, "y2": 201}, {"label": "Product", "x1": 291, "y1": 209, "x2": 723, "y2": 489}, {"label": "Price", "x1": 68, "y1": 252, "x2": 233, "y2": 340}, {"label": "CTA", "x1": 15, "y1": 503, "x2": 137, "y2": 552}, {"label": "CTA", "x1": 807, "y1": 220, "x2": 945, "y2": 248}]}, {"name": "videoframe_93_png.rf.z7HEJd45WV8tHocUss4z.png", "imageSrc": "Capstone.yolov8/train/images/videoframe_93_png.rf.z7HEJd45WV8tHocUss4z.png", "width": 720, "height": 1280, "aois": [{"label": "Product", "x1": 0, "y1": 0, "x2": 716, "y2": 1276}]}, {"name": "wow-momo-png_png.rf.VcU0y3dLngCFtUs4dJg9.png", "imageSrc": "Capstone.yolov8/train/images/wow-momo-png_png.rf.VcU0y3dLngCFtUs4dJg9.png", "width": 800, "height": 387, "aois": [{"label": "logo", "x1": 583, "y1": 6, "x2": 795, "y2": 163}, {"label": "Product", "x1": 33, "y1": 118, "x2": 625, "y2": 365}, {"label": "Headline", "x1": 156, "y1": 14, "x2": 537, "y2": 113}, {"label": "logo", "x1": 260, "y1": 144, "x2": 346, "y2": 193}, {"label": "logo", "x1": 153, "y1": 172, "x2": 225, "y2": 215}, {"label": "logo", "x1": 58, "y1": 181, "x2": 124, "y2": 216}]}];
@@ -669,7 +809,6 @@
     const MAX_GAZE_JUMP_PX = 450;
     const MAX_VALIDATION_MEDIAN_ERROR_PX = 100;
     const MAX_VALIDATION_P90_ERROR_PX = 180;
-    const GAZE_MODEL_INTERVAL_MS = 140;
     const CALIBRATION_POINTS = [
       [0.1, 0.12], [0.3, 0.12], [0.5, 0.12], [0.7, 0.12], [0.9, 0.12],
       [0.1, 0.37], [0.3, 0.37], [0.5, 0.37], [0.7, 0.37], [0.9, 0.37],
@@ -682,7 +821,8 @@
     ];
     const CALIBRATION_WINDOW_MS = 1800;
     const MIN_CALIBRATION_FRAMES = 7;
-    const CALIBRATION_SETTLE_MS = 400;
+    // Legacy iris mode: ignore frames this soon after a dot appears (the eye is still moving).
+    const CALIBRATION_SETTLE_MS = 600;
     const AOI_COLORS = {
       Product: "#3b82f6",
       Headline: "#8b5cf6",
@@ -725,6 +865,9 @@
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const downloadBtn = document.getElementById("downloadBtn");
+    const reportBtn = document.getElementById("reportBtn");
+    const gazeDotToggle = document.getElementById("gazeDotToggle");
+    const modelNote = document.getElementById("modelNote");
 
     let samples = [];
     let currentPoster = POSTERS[0];
@@ -752,14 +895,13 @@
     let faceMesh = null;
     let irisRunning = false;
     let irisProcessing = false;
-    let pretrainedGazeRunning = false;
-    let pretrainedGazeBusy = false;
-    let gazeFrameCanvas = null;
     let irisVideo = null;
     let cameraStream = null;
     let irisState = createEmptyIrisState();
     let sessionActive = false;
     let sessionToken = 0;
+    let targetShownAt = 0;
+    let lastCameraSettings = null;
 
     function createEmptyIrisState() {
       return {
@@ -778,6 +920,8 @@
     function setStatus(text, tone = "ready") {
       statusEl.textContent = text;
       statusEl.className = `metric-value status-badge ${tone}`;
+      const hud = document.getElementById("studyHudText");
+      if (hud) hud.textContent = text;
     }
 
     function formatPosterName(name) {
@@ -1069,8 +1213,10 @@
       if (!poster.naturalWidth || !poster.naturalHeight) return;
       const stage = poster.closest(".stage");
       if (!stage) return;
-      const maxWidth = Math.max(120, Math.min(stage.clientWidth - 48, 720));
-      const maxHeight = Math.max(120, Math.min(stage.clientHeight - 48, 700));
+      const studyMode = document.body.classList.contains("study-mode");
+      const margin = studyMode ? 12 : 48;
+      const maxWidth = Math.max(120, Math.min(stage.clientWidth - margin, studyMode ? Infinity : 720));
+      const maxHeight = Math.max(120, Math.min(stage.clientHeight - margin, studyMode ? Infinity : 700));
       const fitScale = Math.min(maxWidth / poster.naturalWidth, maxHeight / poster.naturalHeight);
       const fittedWidth = Math.round(poster.naturalWidth * fitScale);
       const fittedHeight = Math.round(poster.naturalHeight * fitScale);
@@ -1093,12 +1239,14 @@
         audio: false,
         video: {
           facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          // The iris is only a few pixels wide at 640x480; 720p+ doubles the signal.
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
           frameRate: { ideal: 30, max: 30 }
         }
       });
       cameraPreview.srcObject = cameraStream;
+      lastCameraSettings = cameraStream.getVideoTracks()[0]?.getSettings?.() || null;
       await cameraPreview.play();
       cameraMount.classList.add("camera-active");
       irisVideo = cameraPreview;
@@ -1196,8 +1344,8 @@
     function collectRecentMean(buffer) {
       const now = performance.now();
       const values = buffer.filter((sample) => (
-        now - sample.time <= CALIBRATION_WINDOW_MS &&
-        now - sample.time >= CALIBRATION_SETTLE_MS
+        sample.time - targetShownAt >= CALIBRATION_SETTLE_MS &&
+        now - sample.time <= CALIBRATION_WINDOW_MS
       ));
       if (values.length < MIN_CALIBRATION_FRAMES || values[values.length - 1].time - values[0].time < 700) return null;
       const width = values[0].value.length;
@@ -1322,42 +1470,6 @@
       if (tracking) recordGazeSample(smoothedGaze, prediction, now);
     }
 
-    async function processPretrainedGazeFrame() {
-      if (!pretrainedGazeRunning || pretrainedGazeBusy || gazeModelSelect.value !== "pretrained") return;
-      if (!irisVideo || irisVideo.readyState < 2) {
-        window.setTimeout(processPretrainedGazeFrame, GAZE_MODEL_INTERVAL_MS);
-        return;
-      }
-      pretrainedGazeBusy = true;
-      try {
-        if (!gazeFrameCanvas) gazeFrameCanvas = document.createElement("canvas");
-        gazeFrameCanvas.width = irisVideo.videoWidth;
-        gazeFrameCanvas.height = irisVideo.videoHeight;
-        const context = gazeFrameCanvas.getContext("2d", { alpha: false });
-        context.drawImage(irisVideo, 0, 0, gazeFrameCanvas.width, gazeFrameCanvas.height);
-        const blob = await new Promise((resolve) => gazeFrameCanvas.toBlob(resolve, "image/jpeg", 0.86));
-        if (!blob) throw new Error("Could not prepare camera frame.");
-        const formData = new FormData();
-        formData.append("frame", blob, "frame.jpg");
-        const response = await fetch("/api/gaze/predict", { method: "POST", body: formData });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail || "Local gaze model is unavailable.");
-        if (!payload.face_detected) {
-          gazeDot.style.visibility = "hidden";
-          if (tracking) setCurrentAoi("Face not detected");
-        } else {
-          processPretrainedGazeFeatures(payload.features, performance.now());
-        }
-      } catch (error) {
-        console.warn("Pretrained gaze estimation failed", error);
-        gazeDot.style.visibility = "hidden";
-        if (sessionActive) setStatus("Local gaze model unavailable", "error");
-      } finally {
-        pretrainedGazeBusy = false;
-        if (pretrainedGazeRunning) window.setTimeout(processPretrainedGazeFrame, GAZE_MODEL_INTERVAL_MS);
-      }
-    }
-
     function getIrisSample() {
       return {
         ...irisState,
@@ -1365,8 +1477,9 @@
       };
     }
 
-    function recordGazeSample(gaze, rawGaze, now) {
-      if (now - lastSampleAt < SAMPLE_INTERVAL_MS) return;
+    function recordGazeSample(gaze, rawGaze, now, extra = {}) {
+      // Engine frames are already paced by inference; keep every one for fixation detection.
+      if (now - lastSampleAt < (isEngineMode() ? 0 : SAMPLE_INTERVAL_MS)) return;
       const sampleDuration = lastSampleAt ? Math.round(now - lastSampleAt) : SAMPLE_INTERVAL_MS;
       lastSampleAt = now;
       const point = viewportToPosterCoordinates(gaze.x, gaze.y);
@@ -1388,7 +1501,9 @@
         poster_width: IMAGE_WIDTH,
         poster_height: IMAGE_HEIGHT,
         aoi_bounds_json: JSON.stringify(AOIS),
-        ...getIrisSample()
+        ...getIrisSample(),
+        ...engineSampleFields(),
+        ...extra
       });
       sampleCountEl.textContent = String(samples.length);
     }
@@ -1481,17 +1596,13 @@
     function startIrisTracking() {
       irisState = createEmptyIrisState();
       irisRunning = true;
-      pretrainedGazeRunning = true;
       updateIrisStatus("Starting");
       processIrisFrame();
-      if (gazeModelSelect.value === "pretrained") processPretrainedGazeFrame();
     }
 
     function stopIrisTracking() {
       irisRunning = false;
       irisProcessing = false;
-      pretrainedGazeRunning = false;
-      pretrainedGazeBusy = false;
       gazeDot.style.visibility = "hidden";
     }
 
@@ -1575,6 +1686,7 @@
     function advanceCalibration(event) {
       event.preventDefault();
       event.stopPropagation();
+      if (isEngineMode()) return; // engine targets capture automatically on dwell
 
       if (!calibrationPoint) {
         return;
@@ -1641,6 +1753,7 @@
     function moveCalibrationTarget(point, isAccuracy = false) {
       ensureCalibrationLayer();
       calibrationPoint = point;
+      targetShownAt = performance.now();
       recentFeatures = [];
       recentPredictions = [];
       resetGazeSmoothing();
@@ -1729,7 +1842,21 @@
       startBtn.disabled = true;
       stopBtn.disabled = false;
       setPickerEnabled(false);
-      setStatus(gazeModelSelect.value === "custom" ? "Starting custom iris gaze tracker" : "Starting local pretrained gaze model", "starting");
+      reportBtn.disabled = true;
+      setStatus(isEngineMode() ? "Starting gaze engine" : "Starting legacy iris tracker", "starting");
+
+      if (isEngineMode()) {
+        await requestStudyFullscreen(); // must run inside the Start click
+        await attachCameraPreview();
+        if (!sessionActive || currentSessionToken !== sessionToken) {
+          releaseCamera();
+          return;
+        }
+        sessionStartedAt = performance.now();
+        updateIrisStatus("Starting");
+        await startEngineSession();
+        return;
+      }
 
       await attachCameraPreview();
       const mesh = await ensureFaceMesh();
@@ -1745,6 +1872,9 @@
     }
 
     function stopTracking() {
+      const wasEngineSession = isEngineMode() && document.body.classList.contains("study-mode");
+      stopEngine();
+      exitStudyMode();
       sessionActive = false;
       sessionToken += 1;
       tracking = false;
@@ -1752,13 +1882,18 @@
       startBtn.disabled = false;
       setPickerEnabled(true);
       downloadBtn.disabled = samples.length === 0;
+      reportBtn.disabled = !(engine.validation || accuracyErrors.length);
       setStatus(samples.length ? "Stopped" : "No samples", "stopped");
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      if (wasEngineSession && samples.length >= 10) showSessionResults();
       finishCalibrationLayer();
       stopIrisTracking();
       releaseCamera();
     }
 
     function recoverFromStartFailure() {
+      stopEngine();
+      exitStudyMode();
       sessionActive = false;
       sessionToken += 1;
       tracking = false;
@@ -1771,6 +1906,1112 @@
       setStatus("Camera blocked or eye tracking failed", "error");
     }
 
+    // ------------------------------------------------------------------
+    // Calibrated gaze engine. Frames go to the local API over a WebSocket,
+    // where ETH-XGaze + head pose produce a gaze ray; this page only shows
+    // targets and records the calibrated screen points it gets back.
+    // ------------------------------------------------------------------
+    const ENGINE_CALIBRATION_POINTS = [
+      [0.08, 0.1], [0.5, 0.1], [0.92, 0.1],
+      [0.08, 0.5], [0.5, 0.5], [0.92, 0.5],
+      [0.08, 0.9], [0.5, 0.9], [0.92, 0.9],
+      [0.29, 0.3], [0.71, 0.3], [0.29, 0.7], [0.71, 0.7]
+    ];
+    // Held-out validation locations: never used for fitting.
+    const ENGINE_VALIDATION_POINTS = [
+      [0.2, 0.2], [0.5, 0.24], [0.8, 0.2], [0.24, 0.5],
+      [0.76, 0.5], [0.2, 0.8], [0.5, 0.76], [0.8, 0.8]
+    ];
+    const ENGINE_DRIFT_POINTS = [[0.5, 0.5], [0.3, 0.35], [0.7, 0.35], [0.3, 0.65], [0.7, 0.65]];
+    const ENGINE_TARGET_MS = 1900;        // 600 ms settle (dropped server-side) + 1300 ms capture
+    const ENGINE_DRIFT_TARGET_MS = 1500;
+    // Webcam gaze can drift within half a minute (posture, lighting), so check often.
+    const ENGINE_DRIFT_INTERVAL_MS = 20000;
+    // Retro-correction larger than this is too uncertain to trust; those samples are dropped.
+    const ENGINE_MAX_RETRO_CORRECTION_PX = 300;
+    const ENGINE_MAX_TARGET_RETRIES = 2;
+    // Re-measure the worst calibration dots when the leave-one-out error is above this.
+    const ENGINE_REFINE_CV_PX = 80;
+    // A calibration that still disagrees this much with its own dots is redone.
+    const ENGINE_MAX_CV_PX = 150;
+    const ENGINE_REASON_TEXT = {
+      ok: "Good", no_face: "No face", blink: "Blink", looking_away: "Looking away",
+      bad_distance: "Too near / far", pose_failed: "Pose failed", bad_frame: "Bad frame"
+    };
+    const engine = {
+      ws: null, flow: 0, waiters: [], frameInFlight: false, frameSentAt: 0, canvas: null,
+      frameLoopRunning: false, watchdog: null, fit: null, validation: null,
+      driftTimer: null, driftActive: false, lastDriftAt: 0, driftCount: 0, driftLog: [], resizeTimer: null,
+      inFlight: 0, encoding: false, validStreak: 0, recordingStartedAt: 0, recordedMs: 0, ignoreUntil: 0,
+      poseSamples: [], recentPoses: [], basePose: null, poseDev: null, poseOffSince: 0, cameraLock: null,
+      screen: null, replyTimes: [], procTimes: [], framesTotal: 0, framesValid: 0
+    };
+    // Frames are pipelined: while the server runs the model on one frame the
+    // browser is already encoding/sending the next, which hides network and
+    // JPEG time and raises the frame rate on slower CPUs.
+    const ENGINE_MAX_IN_FLIGHT = 2;
+    const ENGINE_RECOMMENDED_RECORDING_S = 45;
+    // After the poster reappears the eyes need a moment to land on it.
+    const ENGINE_RECORDING_SETTLE_MS = 700;
+
+    function sleep(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+
+    function isEngineMode() {
+      return gazeModelSelect.value === "engine";
+    }
+
+    function engineAlive(flow) {
+      return sessionActive && flow === engine.flow && Boolean(engine.ws);
+    }
+
+    function engineWait(type, predicate = () => true, timeoutMs = 20000) {
+      return new Promise((resolve, reject) => {
+        const waiter = { type, predicate, resolve, reject };
+        waiter.timer = window.setTimeout(() => {
+          engine.waiters = engine.waiters.filter((item) => item !== waiter);
+          reject(new Error(`The gaze engine did not answer (${type}).`));
+        }, timeoutMs);
+        engine.waiters.push(waiter);
+      });
+    }
+
+    function engineRejectWaiters(reason) {
+      const pending = engine.waiters;
+      engine.waiters = [];
+      pending.forEach((waiter) => {
+        window.clearTimeout(waiter.timer);
+        waiter.reject(reason);
+      });
+    }
+
+    function engineSend(message) {
+      if (engine.ws && engine.ws.readyState === WebSocket.OPEN) engine.ws.send(JSON.stringify(message));
+    }
+
+    function engineDispatch(message) {
+      if (message.type === "gaze") {
+        engine.inFlight = Math.max(0, engine.inFlight - 1);
+        engine.frameInFlight = engine.inFlight > 0;
+        const now = performance.now();
+        engine.replyTimes.push(now);
+        if (engine.replyTimes.length > 60) engine.replyTimes.shift();
+        if (typeof message.proc_ms === "number") {
+          engine.procTimes.push(message.proc_ms);
+          if (engine.procTimes.length > 300) engine.procTimes.shift();
+        }
+        engine.framesTotal += 1;
+        if (message.valid) engine.framesValid += 1;
+        handleEngineGaze(message);
+        scheduleEngineFrame();
+        return;
+      }
+      if (message.type === "error" && message.fatal) {
+        engineFail(`Gaze engine unavailable: ${message.detail}`);
+        return;
+      }
+      if (message.type === "status" && message.stage === "loading_model") {
+        setStatus("Loading gaze model (first run downloads it)…", "starting");
+      }
+      const waiter = engine.waiters.find((item) => item.type === message.type && item.predicate(message));
+      if (waiter) {
+        window.clearTimeout(waiter.timer);
+        engine.waiters = engine.waiters.filter((item) => item !== waiter);
+        waiter.resolve(message);
+      } else if (message.type === "error") {
+        console.warn("Gaze engine:", message.detail);
+      }
+    }
+
+    async function engineConnect() {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/gaze/stream`);
+      ws.binaryType = "arraybuffer";
+      engine.ws = ws;
+      ws.onmessage = (event) => {
+        try {
+          engineDispatch(JSON.parse(event.data));
+        } catch (error) {
+          console.warn("Bad gaze engine message", error);
+        }
+      };
+      ws.onclose = () => {
+        if (engine.ws !== ws) return;
+        engine.ws = null;
+        if (sessionActive && isEngineMode()) engineFail("Connection to the gaze engine closed.");
+      };
+      await new Promise((resolve, reject) => {
+        ws.onopen = resolve;
+        ws.onerror = () => reject(new Error("Could not reach the gaze engine. Start the API (uvicorn api.main:app) and open this page through it."));
+      });
+      // The first run may download the model checkpoint.
+      await engineWait("status", (message) => message.stage === "model_ready", 300000);
+      const ready = engineWait("ready");
+      engine.screen = { width: window.innerWidth, height: window.innerHeight, device_pixel_ratio: window.devicePixelRatio };
+      engineSend({ type: "hello", screen: { width: window.innerWidth, height: window.innerHeight } });
+      await ready;
+    }
+
+    function engineFps() {
+      const times = engine.replyTimes;
+      if (times.length < 2) return null;
+      return (times.length - 1) / ((times[times.length - 1] - times[0]) / 1000);
+    }
+
+    function median(values) {
+      if (!values.length) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
+    }
+
+    function scheduleEngineFrame() {
+      if (engine.frameLoopRunning) window.requestAnimationFrame(sendEngineFrame);
+    }
+
+    async function sendEngineFrame() {
+      if (!engine.frameLoopRunning || engine.encoding || engine.inFlight >= ENGINE_MAX_IN_FLIGHT) return;
+      if (!engine.ws || engine.ws.readyState !== WebSocket.OPEN) return;
+      const video = cameraPreview;
+      if (!video || video.readyState < 2 || !video.videoWidth) {
+        window.setTimeout(scheduleEngineFrame, 50);
+        return;
+      }
+      engine.encoding = true;
+      engine.inFlight += 1;
+      engine.frameInFlight = true;
+      engine.frameSentAt = performance.now();
+      if (!engine.canvas) engine.canvas = document.createElement("canvas");
+      engine.canvas.width = video.videoWidth;
+      engine.canvas.height = video.videoHeight;
+      const context = engine.canvas.getContext("2d", { alpha: false });
+      const capturedAt = performance.now();
+      context.drawImage(video, 0, 0, engine.canvas.width, engine.canvas.height);
+      const blob = await new Promise((resolve) => engine.canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob || !engine.ws || engine.ws.readyState !== WebSocket.OPEN) {
+        engine.inFlight = Math.max(0, engine.inFlight - 1);
+        engine.encoding = false;
+        window.setTimeout(scheduleEngineFrame, 50);
+        return;
+      }
+      const jpeg = new Uint8Array(await blob.arrayBuffer());
+      const packet = new Uint8Array(8 + jpeg.length);
+      new DataView(packet.buffer).setFloat64(0, capturedAt, true);
+      packet.set(jpeg, 8);
+      engine.ws.send(packet);
+      engine.encoding = false;
+      scheduleEngineFrame(); // fill the pipeline
+    }
+
+    function startEngineFrames() {
+      engine.frameLoopRunning = true;
+      engine.frameInFlight = false;
+      engine.inFlight = 0;
+      engine.encoding = false;
+      window.clearInterval(engine.watchdog);
+      // If a reply is ever lost, do not stall the stream.
+      engine.watchdog = window.setInterval(() => {
+        if (engine.inFlight > 0 && performance.now() - engine.frameSentAt > 4000) {
+          engine.inFlight = 0;
+          engine.frameInFlight = false;
+          engine.encoding = false;
+          scheduleEngineFrame();
+        }
+      }, 1000);
+      scheduleEngineFrame();
+    }
+
+    function handleEngineGaze(message) {
+      const text = ENGINE_REASON_TEXT[message.reason] || message.reason;
+      const fps = engineFps();
+      updateIrisStatus(`${text}${fps ? ` · ${fps.toFixed(0)} fps` : ""}${message.head_moved ? " · return to calibration position" : ""}`);
+      engine.validStreak = message.valid ? engine.validStreak + 1 : 0;
+      engine.lastMessage = message;
+      trackPose(message);
+      updateHudDistance(message);
+      irisState = {
+        ...createEmptyIrisState(),
+        face_detected: message.reason === "no_face" ? 0 : 1,
+        eyes_detected: message.valid ? 1 : 0,
+        iris_tracking_ok: message.valid ? 1 : 0
+      };
+      if (!message.valid || typeof message.x !== "number") {
+        if (tracking && !engine.driftActive) {
+          setCurrentAoi(message.reason === "no_face" ? "Face not detected" : "Invalid eye sample");
+        }
+        gazeDot.style.visibility = "hidden";
+        return;
+      }
+      // A visible gaze cursor pulls the eye toward it, so it is off by default.
+      if (tracking && !engine.driftActive && gazeDotToggle.checked) {
+        gazeDot.style.visibility = "visible";
+        gazeDot.style.transform = `translate(${message.x}px, ${message.y}px)`;
+      } else {
+        gazeDot.style.visibility = "hidden";
+      }
+      if (tracking && !engine.driftActive && message.t >= engine.ignoreUntil) {
+        recordGazeSample(
+          { x: message.x, y: message.y },
+          { x: message.raw_x, y: message.raw_y },
+          message.t,
+          {
+            face_distance_cm: message.distance_cm ?? "",
+            head_moved: message.head_moved ? 1 : 0,
+            // Head pose per sample, so drift can be traced to posture changes.
+            head_yaw_deg: message.yaw_deg ?? "",
+            head_pitch_deg: message.pitch_deg ?? "",
+            face_cx: Array.isArray(message.face_box) ? Number(((message.face_box[0] + message.face_box[2]) / 2).toFixed(4)) : "",
+            face_cy: Array.isArray(message.face_box) ? Number(((message.face_box[1] + message.face_box[3]) / 2).toFixed(4)) : ""
+          }
+        );
+      }
+    }
+
+    async function engineShowTarget(flow, phase, id, ratio, dwellMs, replaces = null) {
+      const point = [Math.round(window.innerWidth * ratio[0]), Math.round(window.innerHeight * ratio[1])];
+      document.body.classList.add("target-active");
+      moveCalibrationTarget(point, phase !== "calibration");
+      calibrationTarget.style.setProperty("--dwell", `${dwellMs}ms`);
+      calibrationTarget.classList.remove("auto");
+      void calibrationTarget.offsetWidth; // restart the shrinking ring
+      calibrationTarget.classList.add("auto");
+      engineSend({ type: "target_start", phase, id, replaces, x: point[0], y: point[1], t: performance.now() });
+      await sleep(dwellMs);
+      document.body.classList.remove("target-active");
+      if (!engineAlive(flow)) return null;
+      const result = engineWait("target_result", (message) => message.id === id);
+      engineSend({ type: "target_end", id });
+      return result;
+    }
+
+    async function engineFit(flow) {
+      const fitResult = engineWait("fit_result");
+      engineSend({ type: "fit" });
+      const fit = await fitResult;
+      return engineAlive(flow) ? fit : null;
+    }
+
+    async function runEngineCalibration(flow) {
+      tracking = false;
+      calibrationMode = "calibration";
+      gazeDot.style.visibility = "hidden";
+      const ready = engineWait("ready");
+      engineSend({ type: "reset" });
+      await ready;
+
+      engine.round = (engine.round || 0) + 1;
+      engine.poseSamples = [];
+      const tag = `${flow}.${engine.round}`;
+      engine.retried = [];
+      let accepted = 0;
+      const indexById = {};
+      for (let index = 0; index < ENGINE_CALIBRATION_POINTS.length; index += 1) {
+        for (let attempt = 0; attempt <= ENGINE_MAX_TARGET_RETRIES; attempt += 1) {
+          setStatus(
+            `Calibrating ${index + 1}/${ENGINE_CALIBRATION_POINTS.length}${attempt ? " · keep your head still and look at the centre" : " · look at the dot"}`,
+            "calibrating"
+          );
+          const id = `${tag}-c${index}-${attempt}`;
+          const result = await engineShowTarget(flow, "calibration", id, ENGINE_CALIBRATION_POINTS[index], ENGINE_TARGET_MS);
+          if (!result || !engineAlive(flow)) return null;
+          if (result.accepted) {
+            accepted += 1;
+            indexById[id] = index;
+            break;
+          }
+        }
+      }
+
+      setStatus("Fitting calibration…", "calibrating");
+      let fit = await engineFit(flow);
+      if (!fit) return null;
+      if (!fit.ok) {
+        engineFail(`Calibration failed (${accepted} usable targets): ${fit.reason}`);
+        return null;
+      }
+      // Refinement: re-measure the dots that disagree most with the others
+      // (a glance away or a late arrival on one dot otherwise bends the whole fit).
+      if (fit.cv_median_px > ENGINE_REFINE_CV_PX) {
+        const residuals = fit.residuals || {};
+        const limit = Math.max(1.8 * fit.cv_median_px, 120);
+        const redo = [
+          ...(fit.dropped_targets || []),
+          ...Object.entries(residuals).filter(([, error]) => error > limit).sort((a, b) => b[1] - a[1]).map(([id]) => id)
+        ].filter((id) => id in indexById).slice(0, 4);
+        for (let k = 0; k < redo.length; k += 1) {
+          const oldId = redo[k];
+          setStatus(`Refining calibration ${k + 1}/${redo.length} · look at the dot`, "calibrating");
+          const id = `${oldId}-redo`;
+          const result = await engineShowTarget(flow, "calibration", id, ENGINE_CALIBRATION_POINTS[indexById[oldId]], ENGINE_TARGET_MS, oldId);
+          if (!result || !engineAlive(flow)) return null;
+          engine.retried.push({ phase: "calibration", id: oldId, before_px: residuals[oldId] ?? null, accepted: result.accepted });
+        }
+        if (redo.length) {
+          const refined = await engineFit(flow);
+          if (!refined) return null;
+          if (refined.ok) fit = refined;
+        }
+      }
+      engine.fit = fit;
+      if (fit.cv_median_px > ENGINE_MAX_CV_PX) {
+        // No point checking accuracy on a fit that already disagrees with its own dots.
+        return { n: 0, median_px: null, p90_px: null, quality: "poor", reason: "calibration_inconsistent", calibration: fit };
+      }
+
+      calibrationMode = "accuracy";
+      accuracyErrors = [];
+      const validationErrors = {};
+      for (let index = 0; index < ENGINE_VALIDATION_POINTS.length; index += 1) {
+        setStatus(`Accuracy check ${index + 1}/${ENGINE_VALIDATION_POINTS.length}`, "calibrating");
+        const id = `${tag}-v${index}`;
+        const result = await engineShowTarget(flow, "validation", id, ENGINE_VALIDATION_POINTS[index], ENGINE_TARGET_MS);
+        if (!result || !engineAlive(flow)) return null;
+        if (result.accepted) {
+          validationErrors[id] = { index, error: result.error_px };
+          accuracyErrors.push(result.error_px);
+          updateAccuracyStatus();
+        }
+      }
+      // A dot far worse than the rest is usually a missed dot (blink, glance
+      // away), not the tracker: measure it once more; the second reading counts.
+      const typical = median(Object.values(validationErrors).map((item) => item.error)) || 0;
+      const outliers = Object.entries(validationErrors)
+        .filter(([, item]) => item.error > Math.max(2.5 * typical, 200))
+        .sort((a, b) => b[1].error - a[1].error)
+        .slice(0, 3);
+      for (let k = 0; k < outliers.length; k += 1) {
+        const [oldId, item] = outliers[k];
+        setStatus(`Re-checking ${k + 1}/${outliers.length} · look at the dot`, "calibrating");
+        const result = await engineShowTarget(flow, "validation", `${oldId}-r`, ENGINE_VALIDATION_POINTS[item.index], ENGINE_TARGET_MS, oldId);
+        if (!result || !engineAlive(flow)) return null;
+        engine.retried.push({ phase: "validation", id: oldId, before_px: item.error, after_px: result.accepted ? result.error_px : null });
+        if (result.accepted) validationErrors[oldId] = { index: item.index, error: result.error_px };
+      }
+      accuracyErrors = Object.values(validationErrors).map((item) => item.error);
+      updateAccuracyStatus();
+      const summaryResult = engineWait("validation_result");
+      engineSend({ type: "validation_summary" });
+      const summary = await summaryResult;
+      finishCalibrationLayer();
+      if (summary.n < ENGINE_VALIDATION_POINTS.length - 2) summary.quality = "poor";
+      engine.validation = summary;
+      return summary;
+    }
+
+    async function runEngineStudy(flow) {
+      try {
+        for (let round = 0; round < 2; round += 1) {
+          const summary = await runEngineCalibration(flow);
+          if (!summary || !engineAlive(flow)) return;
+          const degrees = typeof summary.approx_median_deg === "number" ? ` (~${summary.approx_median_deg.toFixed(1)}°)` : "";
+          accuracyStatusEl.textContent = summary.median_px == null
+            ? "No valid check"
+            : `${Math.round(summary.median_px)} px median${degrees} · ${Math.round(summary.p90_px)} px P90 · ${summary.quality}`;
+          if (summary.quality !== "poor") {
+            engineStartRecording(flow, summary);
+            return;
+          }
+          const problem = summary.reason === "calibration_inconsistent"
+            ? "Calibration was inconsistent"
+            : `Accuracy too low (${Math.round(summary.median_px || 0)} px)`;
+          if (recordedSecondsSoFar() >= 5) {
+            if (!(await offerRecalibration(problem))) return;
+          } else {
+            setStatus(`${problem} — redoing it. Keep your head still and look at the small centre of each dot; light your face evenly.`, "error");
+            await sleep(2500);
+          }
+          if (!engineAlive(flow)) return;
+        }
+        if (recordedSecondsSoFar() >= 5) {
+          setStatus("Accuracy check failed twice — finishing with what was recorded.", "warning");
+          stopTracking();
+          return;
+        }
+        engineFail("Accuracy check failed twice. Improve lighting, remove strong backlight, sit at arm's length facing the camera, then press Start again.");
+      } catch (error) {
+        if (engineAlive(flow)) engineFail(error.message || String(error));
+      }
+    }
+
+    function engineStartRecording(flow, summary) {
+      finishCalibrationLayer();
+      tracking = true;
+      calibrationMode = "recording";
+      engine.lastDriftAt = performance.now();
+      engine.recordingStartedAt = performance.now();
+      engine.ignoreUntil = engine.recordingStartedAt + ENGINE_RECORDING_SETTLE_MS;
+      engine.lastCheckT = engine.recordingStartedAt - sessionStartedAt;
+      engine.basePose = medianPose(engine.poseSamples);
+      engine.poseDev = null;
+      engine.poseOffSince = 0;
+      reportBtn.disabled = false;
+      const good = summary.quality === "good";
+      setStatus(
+        good
+          ? `Recording · ${Math.round(summary.median_px)} px median error`
+          : `Recording · fair accuracy (${Math.round(summary.median_px)} px) — small AOIs are approximate`,
+        good ? "recording" : "warning"
+      );
+      window.clearInterval(engine.driftTimer);
+      engine.driftTimer = window.setInterval(() => {
+        updateRecordingTimer();
+        maybeRunDriftCheck(flow);
+      }, 1000);
+      updateRecordingTimer();
+    }
+
+    // Drift builds up gradually between checks (your last session: y crept down
+    // ~450 px over 25 s at a constant distance). A check measures the offset at
+    // its end, so samples since the previous check are corrected by a linearly
+    // growing share of that offset; corrections too large to trust are dropped.
+    function retroCorrectDrift(fromT, toT, offset) {
+      const span = toT - fromT;
+      const out = { corrected: 0, dropped: 0, changeT: null };
+      if (!(span > 0)) return out;
+      // If the head moved inside the interval, the error appeared at that moment:
+      // keep everything before it unchanged and drop what came after.
+      const changeT = findHeadMove(fromT, toT);
+      if (changeT !== null) {
+        out.changeT = changeT;
+        samples.forEach((sample) => {
+          if (sample.gaze_model !== "engine" || sample.timestamp_ms < changeT || sample.timestamp_ms > toT) return;
+          sample.gaze_valid = 0;
+          sample.drift_flag = "head_moved";
+          out.dropped += 1;
+        });
+        return out;
+      }
+      samples.forEach((sample) => {
+        if (sample.gaze_model !== "engine" || sample.timestamp_ms < fromT || sample.timestamp_ms > toT || sample.drift_adjusted_px !== undefined) return;
+        const share = (sample.timestamp_ms - fromT) / span;
+        const dx = offset[0] * share;
+        const dy = offset[1] * share;
+        const magnitude = Math.hypot(dx, dy);
+        sample.drift_adjusted_px = Math.round(magnitude);
+        if (magnitude > ENGINE_MAX_RETRO_CORRECTION_PX) {
+          sample.drift_flag = "correction_too_large";
+          sample.gaze_valid = 0;
+          out.dropped += 1;
+          return;
+        }
+        const x = sample.gaze_screen_x + dx;
+        const y = sample.gaze_screen_y + dy;
+        const point = viewportToPosterCoordinates(x, y);
+        sample.gaze_screen_x = Math.round(x);
+        sample.gaze_screen_y = Math.round(y);
+        sample.gaze_x = point.x;
+        sample.gaze_y = point.y;
+        sample.aoi_hit = isViewportPointOnPoster(x, y) ? getAoiHit(point) : "";
+        out.corrected += 1;
+      });
+      return out;
+    }
+
+    function findHeadMove(fromT, toT) {
+      const inSpan = samples.filter((sample) => (
+        sample.gaze_model === "engine" && sample.timestamp_ms >= fromT && sample.timestamp_ms <= toT &&
+        sample.face_cy !== "" && sample.head_pitch_deg !== "" && sample.face_distance_cm !== ""
+      ));
+      if (inSpan.length < 10) return null;
+      const base = inSpan.filter((sample) => sample.timestamp_ms - inSpan[0].timestamp_ms <= 2000);
+      const ref = {
+        cm: median(base.map((s) => Number(s.face_distance_cm))),
+        pitch: median(base.map((s) => Number(s.head_pitch_deg))),
+        cy: median(base.map((s) => Number(s.face_cy))),
+        cx: median(base.map((s) => Number(s.face_cx)))
+      };
+      let run = 0;
+      for (let i = 0; i < inSpan.length; i += 1) {
+        const s = inSpan[i];
+        const off = Math.abs(Number(s.face_distance_cm) - ref.cm) > 1.5 || Math.abs(Number(s.head_pitch_deg) - ref.pitch) > 2.5 ||
+          Math.abs(Number(s.face_cy) - ref.cy) > 0.012 || Math.abs(Number(s.face_cx) - ref.cx) > 0.012;
+        run = off ? run + 1 : 0;
+        if (run >= 3) return inSpan[i - 2].timestamp_ms;
+      }
+      return null;
+    }
+
+    async function maybeRunDriftCheck(flow) {
+      if (!tracking || engine.driftActive || !engineAlive(flow)) return;
+      const now = performance.now();
+      const scheduled = now - engine.lastDriftAt >= ENGINE_DRIFT_INTERVAL_MS;
+      // Moving the head changes the mapping at once; check right away instead of waiting.
+      const moved = engine.poseOffSince && now - engine.poseOffSince > 1500 && now - engine.lastDriftAt > 4000;
+      if (!scheduled && !moved) return;
+      engine.driftActive = true;
+      const previous = [statusEl.textContent, statusEl.className];
+      try {
+        setStatus("Quick accuracy check · look at the dot", "calibrating");
+        engine.driftCount += 1;
+        const ratio = ENGINE_DRIFT_POINTS[engine.driftCount % ENGINE_DRIFT_POINTS.length];
+        const checkT = performance.now() - sessionStartedAt;
+        const reason = moved && !scheduled ? engine.poseDev : null;
+        let result = await engineShowTarget(flow, "drift", `${flow}-d${engine.driftCount}`, ratio, ENGINE_DRIFT_TARGET_MS);
+        let shownPoint = calibrationPoint;
+        let firstError = null;
+        if (result && result.accepted && result.action === "recalibrate" && engineAlive(flow)) {
+          // A big miss is often a blink or a glance away: look once more before recalibrating.
+          firstError = result.error_px;
+          setStatus("Once more · look at the dot", "calibrating");
+          const again = await engineShowTarget(flow, "drift", `${flow}-d${engine.driftCount}-r`, ratio, ENGINE_DRIFT_TARGET_MS);
+          if (again && again.accepted) {
+            result = again;
+            shownPoint = calibrationPoint;
+          }
+        }
+        finishCalibrationLayer();
+        if (!result || !engineAlive(flow)) return;
+        let retro = null;
+        if (result.accepted && Array.isArray(result.predicted) && shownPoint) {
+          retro = retroCorrectDrift(engine.lastCheckT, checkT, [shownPoint[0] - result.predicted[0], shownPoint[1] - result.predicted[1]]);
+          engine.lastCheckT = checkT;
+        }
+        engine.driftLog.push({
+          t_ms: Math.round(performance.now() - sessionStartedAt),
+          accepted: result.accepted,
+          error_px: result.error_px ?? null,
+          action: result.action ?? result.reason,
+          trigger: reason ? `pose: ${reason}` : "scheduled",
+          first_error_px: firstError,
+          head_move_at_ms: retro && retro.changeT !== null ? Math.round(retro.changeT) : null,
+          retro_corrected_samples: retro ? retro.corrected : 0,
+          retro_dropped_samples: retro ? retro.dropped : 0
+        });
+        if (result.accepted && result.action === "corrected") {
+          // The correction applies to the current posture, so it becomes the new reference.
+          engine.basePose = medianPose(engine.recentPoses) || engine.basePose;
+          engine.poseDev = null;
+          engine.poseOffSince = 0;
+        }
+        if (result.accepted && result.action === "recalibrate") {
+          engine.recordedMs += performance.now() - engine.recordingStartedAt;
+          tracking = false;
+          window.clearInterval(engine.driftTimer);
+          engine.driftActive = false;
+          const again = await offerRecalibration(`Tracking drifted ${Math.round(result.error_px)} px`);
+          if (again && engineAlive(flow)) await runEngineStudy(flow);
+          return;
+        }
+        statusEl.textContent = previous[0];
+        statusEl.className = previous[1];
+      } catch (error) {
+        console.warn("Drift check failed", error);
+      } finally {
+        engine.driftActive = false;
+        engine.lastDriftAt = performance.now();
+        engine.ignoreUntil = engine.lastDriftAt + ENGINE_RECORDING_SETTLE_MS;
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Positioning guide shown before calibration.
+    // ------------------------------------------------------------------
+    const POSITION = { minCm: 45, maxCm: 70, idealCm: 55, meterMin: 25, meterMax: 100, maxYaw: 15, maxPitch: 20, holdMs: 1500 };
+    const position = { scale: 1, cameraKey: "", resolve: null, raw: [] };
+
+    function loadDistanceScale() {
+      const settings = cameraStream?.getVideoTracks?.()[0]?.getSettings?.() || {};
+      position.cameraKey = `gazeDistanceScale:${settings.deviceId || "default"}`;
+      try {
+        const stored = Number(window.localStorage.getItem(position.cameraKey));
+        position.scale = stored > 0.3 && stored < 3 ? stored : 1;
+      } catch (error) {
+        position.scale = 1;
+      }
+    }
+
+    // The distance comes from the head-pose fit with an assumed camera field of
+    // view; "I'm at 50 cm" calibrates that once per webcam.
+    function correctedDistanceCm(rawCm) {
+      return typeof rawCm === "number" ? rawCm * position.scale : null;
+    }
+
+    function evaluatePosition(message) {
+      const result = { face: false, distance: false, centre: false, facing: false, hint: "Looking for your face…", cm: null };
+      if (!message || message.reason === "no_face") {
+        result.hint = "No face found — face the camera with light on your face (no bright window behind you).";
+        return result;
+      }
+      result.face = message.valid || message.reason === "bad_distance" || message.reason === "looking_away";
+      result.cm = correctedDistanceCm(message.distance_cm);
+      result.distance = result.cm !== null && result.cm >= POSITION.minCm && result.cm <= POSITION.maxCm;
+      // An API started before this page was updated sends no face box or head
+      // angles; judge distance only rather than reporting "no face".
+      result.poseMissing = !Array.isArray(message.face_box);
+      const [x1, y1, x2, y2] = result.poseMissing ? [0.4, 0.3, 0.6, 0.6] : message.face_box;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      result.centre = cx >= 0.3 && cx <= 0.7 && cy >= 0.2 && cy <= 0.7;
+      result.facing = result.poseMissing || (typeof message.yaw_deg === "number"
+        && Math.abs(message.yaw_deg) <= POSITION.maxYaw && Math.abs(message.pitch_deg) <= POSITION.maxPitch);
+      if (result.cm !== null && result.cm < POSITION.minCm) {
+        result.hint = `Move back about ${Math.round(POSITION.idealCm - result.cm)} cm`;
+      } else if (result.cm !== null && result.cm > POSITION.maxCm) {
+        result.hint = `Move closer by about ${Math.round(result.cm - POSITION.idealCm)} cm`;
+      } else if (!result.centre) {
+        // The camera image is not mirrored: a face on the image's left is the person's right.
+        if (cx < 0.3) result.hint = "Move a little to your left";
+        else if (cx > 0.7) result.hint = "Move a little to your right";
+        else if (cy < 0.2) result.hint = "Lower your head a little, or tilt the screen back";
+        else result.hint = "Raise your head a little, or tilt the screen forward";
+      } else if (!result.facing) {
+        result.hint = "Turn your head to face the screen straight on";
+      } else if (!message.valid) {
+        result.hint = message.reason === "blink" ? "Keep your eyes open" : "Look at the screen";
+      } else {
+        result.hint = "Perfect — hold still";
+      }
+      result.face = result.face && message.reason !== "blink";
+      return result;
+    }
+
+    function drawPositionGuide(message, state) {
+      const canvas = document.getElementById("positionCanvas");
+      const view = document.getElementById("positionView");
+      const ratio = window.devicePixelRatio || 1;
+      const width = view.clientWidth;
+      const height = view.clientHeight;
+      if (canvas.width !== Math.round(width * ratio)) {
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+      }
+      const context = canvas.getContext("2d");
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      context.clearRect(0, 0, width, height);
+      // Target zone: where a face at ~55 cm, centred, should sit.
+      context.setLineDash([10, 8]);
+      context.lineWidth = 3;
+      context.strokeStyle = "rgba(255, 255, 255, 0.75)";
+      context.beginPath();
+      context.ellipse(width / 2, height * 0.45, width * 0.11, height * 0.27, 0, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+      if (message && message.face_box) {
+        const [x1, y1, x2, y2] = message.face_box;
+        const good = state.distance && state.centre && state.facing && state.face;
+        context.strokeStyle = good ? "#22c55e" : "#f59e0b";
+        context.lineWidth = 4;
+        // Mirror horizontally to match the selfie-style preview.
+        context.strokeRect((1 - x2) * width, y1 * height, (x2 - x1) * width, (y2 - y1) * height);
+      }
+    }
+
+    function updatePositionPanel(state) {
+      const hint = document.getElementById("positionHint");
+      hint.textContent = state.hint;
+      hint.className = state.face && state.distance && state.centre && state.facing ? "good" : "";
+      document.getElementById("positionDistance").textContent = state.cm === null ? "—" : `${Math.round(state.cm)} cm`;
+      const span = POSITION.meterMax - POSITION.meterMin;
+      const pct = (cm) => `${Math.min(100, Math.max(0, ((cm - POSITION.meterMin) / span) * 100))}%`;
+      const zone = document.getElementById("positionZone");
+      zone.style.left = pct(POSITION.minCm);
+      zone.style.width = `calc(${pct(POSITION.maxCm)} - ${pct(POSITION.minCm)})`;
+      const marker = document.getElementById("positionMarker");
+      marker.style.visibility = state.cm === null ? "hidden" : "visible";
+      if (state.cm !== null) marker.style.left = pct(state.cm);
+      [["checkFace", state.face], ["checkDistance", state.distance], ["checkCentre", state.centre], ["checkFacing", state.facing]]
+        .forEach(([id, ok]) => { document.getElementById(id).className = ok ? "ok" : "bad"; });
+    }
+
+    async function runPositioning(flow) {
+      loadDistanceScale();
+      const overlay = document.getElementById("positionOverlay");
+      const video = document.getElementById("positionVideo");
+      video.srcObject = cameraStream;
+      video.play().catch(() => {});
+      const settings = cameraStream?.getVideoTracks?.()[0]?.getSettings?.() || {};
+      if (settings.width && settings.height) document.getElementById("positionView").style.aspectRatio = `${settings.width} / ${settings.height}`;
+      document.getElementById("positionNote").textContent = position.scale !== 1
+        ? `Distance reading corrected for this camera (×${position.scale.toFixed(2)}). Calibration starts by itself once every check is green for 1.5 s.`
+        : "Calibration starts by itself once every check is green for 1.5 s. If the distance looks wrong, sit exactly 50 cm away (measure it) and use the button above.";
+      overlay.classList.add("open");
+      setStatus("Get into position", "starting");
+      let goodSince = 0;
+      let skip = false;
+      position.raw = [];
+      const startButton = document.getElementById("positionStartBtn");
+      const onStart = () => { skip = true; };
+      startButton.addEventListener("click", onStart);
+      try {
+        while (engineAlive(flow)) {
+          const message = engine.lastMessage;
+          const state = evaluatePosition(message);
+          if (message && typeof message.distance_cm === "number") {
+            position.raw.push(message.distance_cm);
+            if (position.raw.length > 15) position.raw.shift();
+          }
+          drawPositionGuide(message, state);
+          updatePositionPanel(state);
+          if (state.poseMissing && !position.warnedOldServer) {
+            position.warnedOldServer = true;
+            document.getElementById("positionNote").textContent =
+              "The server is running an older version, so only distance is checked. Close the server window and start it again to get the full guide.";
+          }
+          const allGood = state.face && state.distance && state.centre && state.facing;
+          const now = performance.now();
+          if (allGood) {
+            goodSince = goodSince || now;
+            if (now - goodSince >= POSITION.holdMs) break;
+          } else {
+            goodSince = 0;
+          }
+          if (skip && state.face) break;
+          await sleep(100);
+        }
+        if (!engineAlive(flow)) return false;
+        engine.positioning = {
+          distance_cm: correctedDistanceCm(engine.lastMessage?.distance_cm),
+          distance_scale: Number(position.scale.toFixed(3)),
+          skipped_checks: skip
+        };
+        return true;
+      } finally {
+        startButton.removeEventListener("click", onStart);
+        overlay.classList.remove("open");
+        video.srcObject = null;
+      }
+    }
+
+    function correctDistanceReading() {
+      const raw = median(position.raw);
+      if (!raw) {
+        document.getElementById("positionNote").textContent = "No distance reading yet — make sure your face is visible, then try again.";
+        return;
+      }
+      position.scale = 50 / raw;
+      try { window.localStorage.setItem(position.cameraKey, String(position.scale)); } catch (error) { /* storage blocked */ }
+      document.getElementById("positionNote").textContent =
+        `Saved for this camera: readings are now multiplied by ${position.scale.toFixed(2)}. Move to 45–70 cm and hold still.`;
+    }
+
+    function updateHudDistance(message) {
+      const chip = document.getElementById("studyHudDistance");
+      const cm = correctedDistanceCm(message.distance_cm);
+      if (tracking && engine.poseDev) {
+        chip.textContent = `⚠ ${engine.poseDev} — return to your starting position`;
+        chip.className = "warn";
+        return;
+      }
+      if (cm === null) {
+        chip.textContent = "";
+        return;
+      }
+      const outOfRange = cm < POSITION.minCm - 5 || cm > POSITION.maxCm + 5 || message.head_moved;
+      chip.textContent = outOfRange
+        ? `⚠ ${Math.round(cm)} cm — ${cm < POSITION.minCm ? "move back" : cm > POSITION.maxCm ? "move closer" : "return to your start position"}`
+        : `${Math.round(cm)} cm`;
+      chip.className = outOfRange ? "warn" : "";
+    }
+
+    // ------------------------------------------------------------------
+    // Head-pose watch: compare the live pose with the pose at calibration.
+    // ------------------------------------------------------------------
+    const POSE_LIMITS = { cm: 3, pitch: 4, yaw: 5, shift: 0.03 };
+
+    function poseOf(message) {
+      if (!message || !Array.isArray(message.face_box) || typeof message.pitch_deg !== "number") return null;
+      const [x1, y1, x2, y2] = message.face_box;
+      return { cm: correctedDistanceCm(message.distance_cm), pitch: message.pitch_deg, yaw: message.yaw_deg, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2 };
+    }
+
+    function medianPose(list) {
+      if (!list || list.length < 3) return null;
+      const pick = (key) => median(list.map((pose) => pose[key]).filter((value) => typeof value === "number"));
+      return { cm: pick("cm"), pitch: pick("pitch"), yaw: pick("yaw"), cx: pick("cx"), cy: pick("cy") };
+    }
+
+    function poseDeviation(pose, base) {
+      if (!pose || !base) return null;
+      if (pose.cm !== null && base.cm !== null && Math.abs(pose.cm - base.cm) > POSE_LIMITS.cm) return pose.cm < base.cm ? "you moved closer" : "you moved back";
+      if (Math.abs(pose.pitch - base.pitch) > POSE_LIMITS.pitch) return "your head tilted";
+      if (Math.abs(pose.yaw - base.yaw) > POSE_LIMITS.yaw) return "your head turned";
+      if (Math.abs(pose.cx - base.cx) > POSE_LIMITS.shift || Math.abs(pose.cy - base.cy) > POSE_LIMITS.shift) return "you shifted position";
+      return null;
+    }
+
+    function trackPose(message) {
+      const pose = poseOf(message);
+      if (!pose) return;
+      if (calibrationMode === "calibration" || calibrationMode === "accuracy") {
+        engine.poseSamples.push(pose);
+        if (engine.poseSamples.length > 600) engine.poseSamples.shift();
+      }
+      engine.recentPoses.push(pose);
+      if (engine.recentPoses.length > 15) engine.recentPoses.shift();
+      if (tracking && engine.basePose) {
+        engine.poseDev = poseDeviation(medianPose(engine.recentPoses.slice(-5)) || pose, engine.basePose);
+        if (engine.poseDev) engine.poseOffSince = engine.poseOffSince || performance.now();
+        else engine.poseOffSince = 0;
+      } else {
+        engine.poseDev = null;
+        engine.poseOffSince = 0;
+      }
+    }
+
+    // Auto exposure / white balance keep changing how the eyes look to the
+    // model, which shows up as slow drift with a perfectly still head. Freeze
+    // them at their current values once the participant is in position.
+    async function lockCameraSettings() {
+      const track = cameraStream?.getVideoTracks?.()[0];
+      if (!track || !track.getCapabilities || !track.applyConstraints) return { locked: [], reason: "not supported by this browser" };
+      const caps = track.getCapabilities();
+      const settings = track.getSettings ? track.getSettings() : {};
+      const advanced = {};
+      const inRange = (key) => caps[key] && typeof settings[key] === "number" && settings[key] >= caps[key].min && settings[key] <= caps[key].max;
+      if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("manual")) {
+        advanced.exposureMode = "manual";
+        if (inRange("exposureTime")) advanced.exposureTime = settings.exposureTime;
+      }
+      if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes("manual")) {
+        advanced.whiteBalanceMode = "manual";
+        if (inRange("colorTemperature")) advanced.colorTemperature = settings.colorTemperature;
+      }
+      if (Array.isArray(caps.focusMode) && caps.focusMode.includes("manual")) {
+        advanced.focusMode = "manual";
+        if (inRange("focusDistance")) advanced.focusDistance = settings.focusDistance;
+      }
+      const modes = Object.keys(advanced).filter((key) => key.endsWith("Mode"));
+      if (!modes.length) return { locked: [], reason: "camera does not allow manual exposure/white balance" };
+      try {
+        await track.applyConstraints({ advanced: [advanced] });
+        return { locked: modes, settings: track.getSettings() };
+      } catch (error) {
+        return { locked: [], reason: error.message || String(error) };
+      }
+    }
+
+    function enterStudyMode() {
+      document.body.classList.add("study-mode");
+      fitPosterToStage();
+      renderAois();
+    }
+
+    function exitStudyMode() {
+      document.body.classList.remove("study-mode");
+      document.getElementById("studyHudTimer").textContent = "";
+      document.getElementById("studyHudDistance").textContent = "";
+      document.body.classList.remove("target-active");
+      document.getElementById("positionOverlay").classList.remove("open");
+      fitPosterToStage();
+      renderAois();
+    }
+
+    function updateRecordingTimer() {
+      const timer = document.getElementById("studyHudTimer");
+      if (!tracking) return;
+      const seconds = Math.floor((engine.recordedMs + performance.now() - engine.recordingStartedAt) / 1000);
+      const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      timer.textContent = seconds < ENGINE_RECOMMENDED_RECORDING_S
+        ? `● ${clock} · aim for ${ENGINE_RECOMMENDED_RECORDING_S}s+`
+        : `● ${clock} · enough data, Stop when ready`;
+    }
+
+    async function startEngineSession() {
+      const flow = ++engine.flow;
+      engine.fit = null;
+      engine.validation = null;
+      engine.driftLog = [];
+      engine.driftCount = 0;
+      engine.recordedMs = 0;
+      engine.replyTimes = [];
+      engine.procTimes = [];
+      engine.framesTotal = 0;
+      engine.framesValid = 0;
+      engine.poseSamples = [];
+      engine.recentPoses = [];
+      engine.basePose = null;
+      engine.cameraLock = null;
+      enterStudyMode();
+      setStatus("Connecting to the gaze engine…", "starting");
+      try {
+        await engineConnect();
+      } catch (error) {
+        engineFail(error.message || String(error));
+        return;
+      }
+      if (!engineAlive(flow)) return;
+      startEngineFrames();
+      if (!(await runPositioning(flow))) return;
+      engine.cameraLock = await lockCameraSettings();
+      engine.studyStarted = true;
+      await runEngineStudy(flow);
+    }
+
+    function engineHandleResize() {
+      // Screen coordinates changed, so the calibration no longer applies.
+      if (!engine.ws || !engine.studyStarted) return;
+      window.clearTimeout(engine.resizeTimer);
+      engine.resizeTimer = window.setTimeout(async () => {
+        if (!sessionActive || !engine.ws) return;
+        const flow = ++engine.flow;
+        if (tracking) engine.recordedMs += performance.now() - engine.recordingStartedAt;
+        tracking = false;
+        window.clearInterval(engine.driftTimer);
+        engineRejectWaiters(new Error("Window resized"));
+        finishCalibrationLayer();
+        const again = await offerRecalibration(
+          document.fullscreenElement ? "Window size changed" : "Full screen was closed (the calibration no longer fits)"
+        );
+        if (!again || !engineAlive(flow)) return;
+        setStatus("Window size changed — recalibrating", "calibrating");
+        try {
+          const ready = engineWait("ready");
+          engineSend({ type: "hello", screen: { width: window.innerWidth, height: window.innerHeight } });
+          await ready;
+        } catch (error) {
+          if (engineAlive(flow)) engineFail(error.message);
+          return;
+        }
+        await runEngineStudy(flow);
+      }, 700);
+    }
+
+    // Ask the participant in the study bar instead of forcing a path. Stop (or
+    // ending the session) resolves the question with "stop".
+    function askChoice(options) {
+      return new Promise((resolve) => {
+        const box = document.getElementById("studyHudChoice");
+        box.innerHTML = "";
+        const done = (id) => {
+          box.innerHTML = "";
+          engine.pendingChoice = null;
+          resolve(id);
+        };
+        engine.pendingChoice = done;
+        options.forEach((option) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = option.label;
+          if (option.primary) button.className = "primary";
+          button.addEventListener("click", () => done(option.id));
+          box.appendChild(button);
+        });
+      });
+    }
+
+    function recordedSecondsSoFar() {
+      if (samples.length < 2) return 0;
+      return Math.round((samples[samples.length - 1].timestamp_ms - samples[0].timestamp_ms) / 1000);
+    }
+
+    // Returns true when the participant wants to recalibrate, false to finish now.
+    async function offerRecalibration(reason) {
+      const seconds = recordedSecondsSoFar();
+      if (seconds < 5) return true; // nothing worth keeping yet: just recalibrate
+      setStatus(`${reason} · ${seconds}s already recorded`, "warning");
+      const choice = await askChoice([
+        { id: "recalibrate", label: "Recalibrate & continue", primary: true },
+        { id: "finish", label: "Finish & see results" }
+      ]);
+      if (choice === "finish") {
+        stopTracking();
+        return false;
+      }
+      return choice === "recalibrate";
+    }
+
+    function stopEngine() {
+      if (engine.pendingChoice) engine.pendingChoice("stop");
+      engine.flow += 1;
+      engine.studyStarted = false;
+      engine.frameLoopRunning = false;
+      engine.frameInFlight = false;
+      engine.driftActive = false;
+      window.clearInterval(engine.driftTimer);
+      window.clearInterval(engine.watchdog);
+      window.clearTimeout(engine.resizeTimer);
+      engineRejectWaiters(new Error("Session stopped"));
+      if (engine.ws) {
+        const ws = engine.ws;
+        engine.ws = null;
+        try { ws.close(); } catch (error) { /* already closed */ }
+      }
+    }
+
+    function engineFail(message) {
+      stopEngine();
+      if (sessionActive) stopTracking();
+      setStatus(message, "error");
+    }
+
+    async function requestStudyFullscreen() {
+      if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+      try {
+        await document.documentElement.requestFullscreen();
+        await sleep(500);
+      } catch (error) {
+        console.info("Fullscreen unavailable; continuing in the window", error);
+      }
+    }
+
+    function engineSampleFields() {
+      if (!isEngineMode()) return {};
+      const rect = poster.getBoundingClientRect();
+      const validation = engine.validation || {};
+      return {
+        gaze_valid: 1,
+        session_median_error_px: validation.median_px ?? "",
+        session_p90_error_px: validation.p90_px ?? "",
+        session_quality: validation.quality ?? "",
+        calibration_cv_px: engine.fit?.cv_median_px ?? "",
+        poster_display_scale: rect.width && IMAGE_WIDTH ? Number((rect.width / IMAGE_WIDTH).toFixed(5)) : "",
+        drift_corrections: engine.driftLog.filter((item) => item.action === "corrected").length
+      };
+    }
+
+    function legacyValidationSummary() {
+      if (!accuracyErrors.length) return null;
+      const sorted = [...accuracyErrors].sort((a, b) => a - b);
+      return {
+        n: sorted.length,
+        median_px: Math.round(sorted[Math.floor(sorted.length / 2)]),
+        p90_px: Math.round(sorted[Math.ceil(sorted.length * 0.9) - 1])
+      };
+    }
+
+    function downloadValidationReport() {
+      const track = cameraStream?.getVideoTracks?.()[0];
+      const report = {
+        poster: POSTER_NAME,
+        gaze_model: gazeModelSelect.value,
+        created_at: new Date().toISOString(),
+        screen: engine.screen || { width: window.innerWidth, height: window.innerHeight, device_pixel_ratio: window.devicePixelRatio },
+        recording_seconds: samples.length ? Math.round((samples[samples.length - 1].timestamp_ms - samples[0].timestamp_ms) / 100) / 10 : 0,
+        performance: isEngineMode() ? {
+          frames: engine.framesTotal,
+          valid_frame_share: engine.framesTotal ? Number((engine.framesValid / engine.framesTotal).toFixed(3)) : null,
+          fps_at_end: engineFps() ? Number(engineFps().toFixed(1)) : null,
+          median_server_ms_per_frame: median(engine.procTimes)
+        } : null,
+        camera: lastCameraSettings || (track?.getSettings ? track.getSettings() : null),
+        positioning: isEngineMode() ? engine.positioning || null : null,
+        camera_lock: isEngineMode() ? engine.cameraLock : null,
+        calibration: isEngineMode() ? engine.fit : null,
+        remeasured_targets: isEngineMode() ? engine.retried || [] : [],
+        validation: isEngineMode() ? engine.validation : legacyValidationSummary(),
+        drift_checks: isEngineMode() ? engine.driftLog : [],
+        samples: samples.length
+      };
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const safePoster = POSTER_NAME.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "_");
+      link.href = url;
+      link.download = `${safePoster}_gaze_report.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    fetch("/api/gaze/engine")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((status) => {
+        if (status && !status.available) {
+          gazeModelSelect.value = "custom";
+          modelNote.textContent = `Gaze engine unavailable on this server (${status.reason}). Using the legacy iris tracker, which is much less accurate.`;
+        }
+      })
+      .catch(() => { /* page opened without the API; Start will report it */ });
+
     function csvEscape(value) {
       const text = String(value ?? "");
       if (/[",\n]/.test(text)) {
@@ -1780,17 +3021,7 @@
     }
 
     function downloadCsv() {
-      const headers = [
-        "timestamp_ms", "gaze_x", "gaze_y", "gaze_screen_x", "gaze_screen_y", "gaze_raw_screen_x", "gaze_raw_screen_y",
-        "duration_ms", "gaze_model", "aoi_hit", "poster",
-        "poster_width", "poster_height", "aoi_bounds_json",
-        "face_detected", "eyes_detected", "iris_tracking_ok", "iris_sample_age_ms",
-        "iris_left_x", "iris_left_y", "iris_right_x", "iris_right_y", "iris_diameter_px"
-      ];
-      const rows = [headers.join(",")].concat(
-        samples.map((sample) => headers.map((header) => csvEscape(sample[header])).join(","))
-      );
-      const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+      const blob = new Blob([buildCsvText()], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       const safePoster = POSTER_NAME.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "_");
@@ -1798,6 +3029,84 @@
       link.download = `${safePoster}_gaze.csv`;
       link.click();
       URL.revokeObjectURL(url);
+    }
+
+    function buildCsvText() {
+      const headers = [
+        "timestamp_ms", "gaze_x", "gaze_y", "gaze_screen_x", "gaze_screen_y", "gaze_raw_screen_x", "gaze_raw_screen_y",
+        "duration_ms", "gaze_model", "aoi_hit", "poster",
+        "poster_width", "poster_height", "aoi_bounds_json",
+        "face_detected", "eyes_detected", "iris_tracking_ok", "iris_sample_age_ms",
+        "iris_left_x", "iris_left_y", "iris_right_x", "iris_right_y", "iris_diameter_px",
+        "gaze_valid", "session_median_error_px", "session_p90_error_px", "session_quality",
+        "calibration_cv_px", "poster_display_scale", "drift_corrections", "face_distance_cm", "head_moved",
+        "drift_adjusted_px", "drift_flag", "head_yaw_deg", "head_pitch_deg", "face_cx", "face_cy"
+      ];
+      const rows = [headers.join(",")].concat(
+        samples.map((sample) => headers.map((header) => csvEscape(sample[header])).join(","))
+      );
+      return rows.join("\n");
+    }
+
+    // Right after Stop, analyze the session with the same endpoint as the
+    // "Analyze gaze file" tab and show the heatmap here.
+    async function showSessionResults() {
+      const overlay = document.getElementById("resultsOverlay");
+      const summary = document.getElementById("resultsSummary");
+      const bars = document.getElementById("resultsBars");
+      const notes = document.getElementById("resultsNotes");
+      const image = document.getElementById("resultsImage");
+      overlay.classList.add("open");
+      image.removeAttribute("src");
+      bars.innerHTML = "";
+      notes.textContent = "";
+      summary.textContent = "Analyzing your session…";
+      try {
+        let posterBlob = await (await fetch(poster.src)).blob();
+        if (!posterBlob.type.startsWith("image/")) {
+          // The API checks the content type; some servers/blob URLs omit it.
+          const extension = (POSTER_NAME.split(".").pop() || "").toLowerCase();
+          const type = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", avif: "image/avif" }[extension] || "image/jpeg";
+          posterBlob = new Blob([posterBlob], { type });
+        }
+        const form = new FormData();
+        form.append("image_file", posterBlob, POSTER_NAME);
+        form.append("gaze_file", new Blob([buildCsvText()], { type: "text/csv" }), "session.csv");
+        const response = await fetch("/api/analyze-gaze", { method: "POST", body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Analysis failed");
+        image.src = result.saliency_image;
+        const stats = result.gaze_stats || {};
+        const quality = result.gaze_quality || {};
+        summary.textContent =
+          `${stats.fixations ?? "?"} fixations over ${((stats.fixation_time_ms || 0) / 1000).toFixed(1)} s` +
+          (quality.validation_median_error_screen_px != null ? ` · accuracy ${Math.round(quality.validation_median_error_screen_px)} px (${quality.session_quality})` : "") +
+          ` · PES ${Math.round(result.pes.score)} (${result.pes.category})`;
+        const entries = Object.entries(result.pes.attention_percentages).sort((a, b) => b[1] - a[1]);
+        entries.forEach(([label, percent]) => {
+          const row = document.createElement("div");
+          row.className = "results-bar";
+          const name = document.createElement("span");
+          name.textContent = label + ((quality.unreliable_aois || []).includes(label) ? " *" : "");
+          const track = document.createElement("span");
+          track.className = "track";
+          const fill = document.createElement("span");
+          fill.className = "fill";
+          fill.style.display = "block";
+          fill.style.width = `${Math.min(100, percent)}%`;
+          track.appendChild(fill);
+          const value = document.createElement("span");
+          value.textContent = `${percent.toFixed(1)}%`;
+          row.append(name, track, value);
+          bars.appendChild(row);
+        });
+        const offPoster = stats.off_poster_ms ? ` ${(stats.off_poster_ms / 1000).toFixed(1)} s of looking fell outside the poster.` : "";
+        notes.textContent =
+          ((quality.unreliable_aois || []).length ? `* Smaller than this session's gaze error, so approximate.` : "") +
+          offPoster + " Numbers on the heatmap are fixations in viewing order; circle size is how long you looked.";
+      } catch (error) {
+        summary.textContent = `Could not analyze the session here (${error.message}). Download the CSV and use Analyze gaze file.`;
+      }
     }
 
     startBtn.addEventListener("click", () => {
@@ -1808,6 +3117,14 @@
     });
     stopBtn.addEventListener("click", stopTracking);
     downloadBtn.addEventListener("click", downloadCsv);
+    reportBtn.addEventListener("click", downloadValidationReport);
+    document.getElementById("studyStopBtn").addEventListener("click", stopTracking);
+    document.getElementById("positionCorrectBtn").addEventListener("click", correctDistanceReading);
+    document.getElementById("resultsCsvBtn").addEventListener("click", downloadCsv);
+    document.getElementById("resultsReportBtn").addEventListener("click", downloadValidationReport);
+    document.getElementById("resultsCloseBtn").addEventListener("click", () => {
+      document.getElementById("resultsOverlay").classList.remove("open");
+    });
     uploadPosterBtn.addEventListener("click", () => customPosterInput.click());
     customPosterInput.addEventListener("change", (event) => {
       loadCustomPoster(event.target.files?.[0]);
@@ -1838,7 +3155,9 @@
     window.addEventListener("resize", () => {
       fitPosterToStage();
       renderAois();
-      if (calibrationLayer) {
+      if (sessionActive && isEngineMode()) {
+        engineHandleResize();
+      } else if (calibrationLayer) {
         calibrationIndex = 0;
         accuracyIndex = 0;
         accuracyErrors = [];

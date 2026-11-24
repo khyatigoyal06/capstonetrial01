@@ -3,13 +3,22 @@ services:
     image: ${DOCKER_IMAGE:-capstone-poster:latest}
     ports:
       - "80:8001"
-      - "8000:8000"
     restart: unless-stopped
     environment:
       - MODEL_WEIGHTS=${MODEL_WEIGHTS:-/app/models/weights/best.pt}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - PYTHONUNBUFFERED=1
+    volumes:
+      - analyses:/app/data            # analysis history (SQLite)
+      - gaze-models:/root/.ptgaze     # gaze-engine model downloads
+      - hf-cache:/root/.cache/huggingface
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1024M
+          cpus: "2.0"
+          memory: 3G                  # PyTorch + YOLO + gaze model need well over 1 GB
+
+volumes:
+  analyses:
+  gaze-models:
+  hf-cache:

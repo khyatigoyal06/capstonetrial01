@@ -12,6 +12,8 @@ The sections below preserve the original audit and plan. They predate the curren
 - `analysis/aoi.py`, `analysis/gaze.py`, `analysis/attention.py`, `analysis/saliency.py`, `analysis/scoring.py`, and `analysis/recommendations.py` remain the shared analysis layer. The existing Streamlit app and CLI are preserved as development/research tools.
 - `docker compose up --build` builds the React frontend and serves it together with FastAPI. `npm run dev` plus Uvicorn remains the local development flow.
 
+- **Gaze engine (2026-11):** `gaze_engine/` replaces the iris-offset tracker: ETH-XGaze appearance model + head pose → gaze ray ∩ camera plane → per-user CV-selected mapping, served over `/api/gaze/stream`. Calibration is dwell-based with held-out validation, drift checks and a recording gate; engine CSVs are analysed as fixations with Gaussian AOI assignment sized by each session's measured error (`analysis/fixations.py`, `analysis/gaze_session.py`). See README.
+
 PES weights and attention bands are still heuristics, not validated advertising outcomes. Saliency uses smallest-box ownership for overlapping AOIs, while recorded gaze matching retains the existing multi-association behavior. WebGazer is the available webcam-based study source; Tobii calibration is not claimed.
 
 ## Historical Phase 0 audit

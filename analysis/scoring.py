@@ -1,43 +1,45 @@
+"""Poster Effectiveness Score (PES), version 2.
+
+PES combines five 0-100 components (weights in config/scoring.yaml):
+
+* **Attention Fit** - each detected element's attention share against a
+  healthy band, weighted by how much that element matters.
+* **Visual Hierarchy** - pairwise agreement between the observed attention
+  order and the expected order (Product, then Headline/CTA, then Price, logo).
+* **Focus** - penalises attention lost to the background and one element
+  swallowing everything.
+* **Completeness** - which key ad elements are present at all. A missing CTA
+  costs its share here instead of zeroing a whole component, as v1 did.
+* **Readability** - WCAG contrast and size of text elements (needs the image).
+
+Components that cannot be measured are excluded and the other weights rescaled.
+The same function scores estimated attention (saliency) and measured attention
+(gaze), so the two are directly comparable.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
-from analysis.aoi import AOIRecord, get_present_aoi_labels
+import numpy as np
+
+from analysis.aoi import AOIRecord
 from config.settings import BACKGROUND_LABEL, CORE_AOI_ORDER, PROJECT_ROOT
-
-
-LABEL_WEIGHTS = {
-    "CTA": 0.4,
-    "Product": 0.35,
-    "Headline": 0.15,
-    "Price": 0.05,
-    "logo": -0.1,
-}
-
-# Fallbacks used when config/scoring.yaml is absent or unreadable.
-_DEFAULT_PES_WEIGHTS = {
-    "Product Attention": 25,
-    "CTA Visibility": 20,
-    "Headline Engagement": 20,
-    "Attention Balance": 15,
-    "Visual Hierarchy": 20,
-}
-
-_DEFAULT_IDEAL_ATTENTION_RANGES = {
-    "Product": (30, 45),
-    "Headline": (15, 30),
-    "CTA": (10, 20),
-    "Price": (5, 15),
-    "logo": (3, 10),
-}
-
-_DEFAULT_PES_CATEGORIES = {"excellent": 80, "good": 65, "average": 50}
 
 SCORING_CONFIG_PATH = PROJECT_ROOT / "config" / "scoring.yaml"
 
+_DEFAULTS: dict[str, Any] = {
+    "pes_version": 2,
+    "pes_weights": {"Attention Fit": 30, "Visual Hierarchy": 20, "Focus": 15, "Completeness": 15, "Readability": 20},
+    "ideal_attention_ranges": {"Product": (30, 45), "Headline": (15, 30), "CTA": (10, 20), "Price": (5, 15), "logo": (3, 10)},
+    "element_importance": {"Product": 0.35, "Headline": 0.25, "CTA": 0.25, "Price": 0.10, "logo": 0.05},
+    "completeness_points": {"Product": 35, "Headline": 25, "CTA": 25, "logo": 10, "Price": 5},
+    "expected_rank": {"Product": 1, "Headline": 2, "CTA": 2, "Price": 3, "logo": 4},
+    "pes_categories": {"excellent": 80, "good": 65, "average": 50},
+}
+
 
 def _load_scoring_config() -> dict[str, Any]:
-    """Read config/scoring.yaml, falling back to built-in defaults."""
     try:
         import yaml
 
@@ -45,182 +47,125 @@ def _load_scoring_config() -> dict[str, Any]:
             loaded = yaml.safe_load(file) or {}
     except Exception:
         loaded = {}
-
-    weights = loaded.get("pes_weights") or _DEFAULT_PES_WEIGHTS
-    ranges = loaded.get("ideal_attention_ranges") or _DEFAULT_IDEAL_ATTENTION_RANGES
-    categories = loaded.get("pes_categories") or _DEFAULT_PES_CATEGORIES
-
-    return {
-        "pes_weights": {str(name): float(weight) for name, weight in weights.items()},
-        "ideal_attention_ranges": {
-            str(label): (float(bounds[0]), float(bounds[1]))
-            for label, bounds in ranges.items()
-        },
-        "pes_categories": {str(name): float(cut) for name, cut in categories.items()},
-    }
+    config = {key: loaded.get(key) or value for key, value in _DEFAULTS.items()}
+    config["pes_weights"] = {str(k): float(v) for k, v in config["pes_weights"].items()}
+    config["ideal_attention_ranges"] = {str(k): (float(v[0]), float(v[1])) for k, v in config["ideal_attention_ranges"].items()}
+    config["element_importance"] = {str(k): float(v) for k, v in config["element_importance"].items()}
+    config["completeness_points"] = {str(k): float(v) for k, v in config["completeness_points"].items()}
+    config["expected_rank"] = {str(k): float(v) for k, v in config["expected_rank"].items()}
+    config["pes_categories"] = {str(k): float(v) for k, v in config["pes_categories"].items()}
+    return config
 
 
 _CONFIG = _load_scoring_config()
-
+PES_VERSION: int = int(_CONFIG["pes_version"])
 PES_WEIGHTS: dict[str, float] = _CONFIG["pes_weights"]
 IDEAL_ATTENTION_RANGES: dict[str, tuple[float, float]] = _CONFIG["ideal_attention_ranges"]
+ELEMENT_IMPORTANCE: dict[str, float] = _CONFIG["element_importance"]
+COMPLETENESS_POINTS: dict[str, float] = _CONFIG["completeness_points"]
+EXPECTED_RANK: dict[str, float] = _CONFIG["expected_rank"]
 PES_CATEGORIES: dict[str, float] = _CONFIG["pes_categories"]
 
 
-def _labels_of(items: Iterable[Any]) -> List[str]:
-    """Return AOI labels from either AOIRecord objects or legacy (label, x1, y1, x2, y2) tuples."""
-    items = list(items)
-    if items and not isinstance(items[0], AOIRecord):
-        labels = {item[0] for item in items}
-        ordered = [label for label in CORE_AOI_ORDER if label in labels]
-        return ordered + sorted(labels - set(CORE_AOI_ORDER))
-    return get_present_aoi_labels(items)
-
-
 def clamp(value: float, minimum: float = 0, maximum: float = 100) -> float:
-    """Keep a score inside the 0-100 range."""
     return max(minimum, min(maximum, value))
 
 
-def score_attention(attention_percentages: Dict[str, float]) -> float:
-    """Compute a 0-100 attention score using label weights and attention percentages."""
-    score = 0.0
-    for label, pct in attention_percentages.items():
-        weight = LABEL_WEIGHTS.get(label, 0.0)
-        score += weight * pct
-
-    # map expected range roughly to 0-100, clamp
-    val = max(0.0, min(100.0, score))
-    return float(val)
-
-
-def presence_score(records: List[AOIRecord]) -> float:
-    labels = set(get_present_aoi_labels(records))
-    # simple heuristic: require Product and CTA for good ad
-    score = 0.0
-    if "Product" in labels:
-        score += 50.0
-    if "CTA" in labels:
-        score += 50.0
-    return float(score)
+def _boxes(items: Iterable[Any]) -> list[tuple[str, int, int, int, int]]:
+    """Normalise AOIRecords or legacy (label, x1, y1, x2, y2) tuples."""
+    out = []
+    for item in items:
+        if isinstance(item, AOIRecord):
+            out.append((item.class_name, item.x1, item.y1, item.x2, item.y2))
+        else:
+            label, x1, y1, x2, y2 = item[:5]
+            out.append((str(label), int(x1), int(y1), int(x2), int(y2)))
+    return out
 
 
-def score_poster(records: List[AOIRecord], attention_percentages: Dict[str, float]) -> Dict[str, float]:
-    att = score_attention(attention_percentages)
-    pres = presence_score(records)
-    overall = 0.7 * att + 0.3 * pres
-    overall = max(0.0, min(100.0, overall))
-    return {"attention_score": att, "presence_score": pres, "overall_score": overall}
+def _present_labels(boxes: list[tuple[str, int, int, int, int]]) -> list[str]:
+    labels = {box[0] for box in boxes}
+    return [label for label in CORE_AOI_ORDER if label in labels] + sorted(labels - set(CORE_AOI_ORDER))
 
 
 def score_for_ideal_range(value: float, low: float, high: float) -> float:
-    """
-    Score an attention percentage against a healthy marketing range.
-    Values inside the range get 100; weak or excessive attention is penalized.
-    """
+    """100 inside [low, high]; falls linearly to 0 at 0% (below) or 100% (above)."""
     if low <= value <= high:
-        return 100
-
+        return 100.0
     if value < low:
-        return clamp((value / low) * 100) if low else 100
-
-    remaining_space = 100 - high
-    if remaining_space <= 0:
-        return 0
-
-    return clamp(100 - ((value - high) / remaining_space) * 100)
+        return clamp(value / low * 100) if low else 100.0
+    remaining = 100 - high
+    return 0.0 if remaining <= 0 else clamp(100 - (value - high) / remaining * 100)
 
 
-def calculate_balance_score(percentages: Dict[str, float], boxes: Iterable[Any]) -> float:
-    """
-    Reward posters where important AOIs receive some attention while background
-    attention and one-element domination stay low.
-    """
-    labels = _labels_of(boxes)
-
-    if not labels:
-        return 0
-
-    meaningful_labels = [
-        label
-        for label in labels
-        if percentages.get(label, 0) >= 5
-    ]
-    coverage_score = (len(meaningful_labels) / len(labels)) * 100
-
-    dominant_attention = max(percentages.get(label, 0) for label in labels)
-    dominance_score = (
-        100
-        if dominant_attention <= 55
-        else clamp(100 - ((dominant_attention - 55) * 2))
-    )
-
-    background_attention = percentages.get(BACKGROUND_LABEL, 0)
-    background_score = clamp(100 - (background_attention * 2))
-
-    return (
-        coverage_score * 0.45
-        + dominance_score * 0.35
-        + background_score * 0.20
-    )
+def attention_fit(percentages: Dict[str, float], labels: List[str]) -> tuple[float | None, dict[str, dict]]:
+    scored = [label for label in labels if label in IDEAL_ATTENTION_RANGES]
+    details: dict[str, dict] = {}
+    if not scored:
+        return None, details
+    total_weight = sum(ELEMENT_IMPORTANCE.get(label, 0.1) for label in scored)
+    score = 0.0
+    for label in scored:
+        low, high = IDEAL_ATTENTION_RANGES[label]
+        share = float(percentages.get(label, 0.0))
+        band_score = score_for_ideal_range(share, low, high)
+        status = "healthy" if band_score >= 100 else ("too low" if share < low else "too high")
+        details[label] = {"attention_pct": round(share, 2), "ideal_range": [low, high], "fit": round(band_score, 1), "status": status}
+        score += band_score * ELEMENT_IMPORTANCE.get(label, 0.1) / total_weight
+    return score, details
 
 
-def calculate_hierarchy_score(percentages: Dict[str, float], boxes: Iterable[Any]) -> float:
-    """
-    Reward a marketing-friendly visual hierarchy:
-    Product should lead, while Headline and CTA should appear near the top.
-    """
-    labels = _labels_of(boxes)
-    ranked_labels = [
-        label
-        for label, _ in sorted(
-            ((label, percentages.get(label, 0)) for label in labels),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-    ]
+def visual_hierarchy(percentages: Dict[str, float], labels: List[str]) -> tuple[float | None, list[str]]:
+    """Share of element pairs whose attention order matches the expected order."""
+    ranked = [label for label in labels if label in EXPECTED_RANK]
+    observed_order = sorted(ranked, key=lambda label: percentages.get(label, 0.0), reverse=True)
+    if len(ranked) < 2:
+        if not ranked:
+            return None, observed_order
+        return (100.0 if ranked[0] == "Product" else 60.0), observed_order
+    agree = total = 0.0
+    for i, a in enumerate(ranked):
+        for b in ranked[i + 1 :]:
+            if EXPECTED_RANK[a] == EXPECTED_RANK[b]:
+                continue
+            first, second = (a, b) if EXPECTED_RANK[a] < EXPECTED_RANK[b] else (b, a)
+            gap = percentages.get(first, 0.0) - percentages.get(second, 0.0)
+            total += 1
+            agree += 1.0 if gap > 2 else (0.5 if gap >= -2 else 0.0)  # near-ties count half
+    return (agree / total * 100 if total else 100.0), observed_order
 
-    if not ranked_labels or max(percentages.get(label, 0) for label in labels) == 0:
-        return 0
 
-    rank_map = {
-        label: rank
-        for rank, label in enumerate(ranked_labels, start=1)
-    }
+def focus(percentages: Dict[str, float], labels: List[str]) -> float:
+    background = float(percentages.get(BACKGROUND_LABEL, 0.0))
+    background_score = clamp(100 - max(0.0, background - 15) * 2.5)  # 15% ok, 55% -> 0
+    element_total = sum(percentages.get(label, 0.0) for label in labels)
+    if element_total <= 0 or len(labels) < 2:
+        return background_score
+    top_share = max(percentages.get(label, 0.0) for label in labels) / element_total * 100
+    dominance_score = clamp(100 - max(0.0, top_share - 60) / 35 * 100)  # 60% ok, 95% -> 0
+    return 0.6 * background_score + 0.4 * dominance_score
 
-    score = 0
 
-    product_rank = rank_map.get("Product")
-    if product_rank == 1:
-        score += 35
-    elif product_rank == 2:
-        score += 25
-    elif product_rank == 3:
-        score += 15
+def completeness(labels: List[str]) -> tuple[float, list[str]]:
+    present = set(labels)
+    missing = [label for label in COMPLETENESS_POINTS if label not in present]
+    return clamp(sum(points for label, points in COMPLETENESS_POINTS.items() if label in present)), missing
 
-    headline_rank = rank_map.get("Headline")
-    if headline_rank and headline_rank <= 3:
-        score += 25
-    elif percentages.get("Headline", 0) > 0:
-        score += 10
 
-    cta_rank = rank_map.get("CTA")
-    if cta_rank and cta_rank <= 3:
-        score += 25
-    elif percentages.get("CTA", 0) > 0:
-        score += 10
+def readability(image: np.ndarray | None, boxes: list[tuple[str, int, int, int, int]]) -> tuple[float | None, list[dict]]:
+    if image is None:
+        return None, []
+    from analysis.readability import assess_text_elements
 
-    background_attention = percentages.get(BACKGROUND_LABEL, 0)
-    if background_attention <= 10:
-        score += 15
-    elif background_attention <= 20:
-        score += 8
-
-    return clamp(score)
+    items = assess_text_elements(image, boxes)
+    if not items:
+        return None, []
+    weights = {"Headline": 0.4, "CTA": 0.4, "Price": 0.2}
+    total = sum(weights[item.label] for item in items)
+    return sum(item.score * weights[item.label] for item in items) / total, [item.to_dict() for item in items]
 
 
 def get_pes_category(score: float) -> str:
-    """Translate a numeric PES into a simple interpretation."""
     if score >= PES_CATEGORIES.get("excellent", 80):
         return "Excellent"
     if score >= PES_CATEGORIES.get("good", 65):
@@ -230,76 +175,68 @@ def get_pes_category(score: float) -> str:
     return "Needs Improvement"
 
 
-def build_design_insights(
-    percentages: Dict[str, float],
-    boxes: Iterable[Any],
-    component_scores: Dict[str, float],
-) -> List[str]:
-    """Generate human-readable poster improvement notes from PES inputs."""
-    labels = set(_labels_of(boxes))
-    insights = []
-
-    if "Product" not in labels:
-        insights.append("Product AOI is missing, so the main food item cannot be evaluated.")
-    elif percentages.get("Product", 0) < 25:
-        insights.append("Product attention is low; make the food item larger, clearer, or more central.")
-    elif percentages.get("Product", 0) > 55:
-        insights.append("Product dominates strongly; supporting text or CTA may need more visual weight.")
-    else:
-        insights.append("Product visibility is healthy.")
-
-    if "CTA" not in labels:
-        insights.append("CTA is missing; add a clear action such as order now, visit, or buy.")
-    elif percentages.get("CTA", 0) < 8:
-        insights.append("CTA is being ignored; improve contrast, size, or placement.")
-    else:
-        insights.append("CTA is receiving useful attention.")
-
-    if "Headline" not in labels:
-        insights.append("Headline is missing; add a short message to guide viewer understanding.")
-    elif percentages.get("Headline", 0) < 10:
-        insights.append("Headline engagement is weak; improve readability and position.")
-
-    if percentages.get(BACKGROUND_LABEL, 0) > 25:
-        insights.append("Too much attention is going outside AOIs; reduce clutter or mark important regions.")
-
-    if component_scores["Attention Balance"] < 50:
-        insights.append("Attention is concentrated on too few elements; improve balance across key AOIs.")
-
-    if component_scores["Visual Hierarchy"] < 60:
-        insights.append("Visual hierarchy is weak; Product, Headline, and CTA should guide the viewer in order.")
-
-    return insights
+def _insights(components: dict[str, float], elements: dict, order: list[str], missing: list[str],
+              text: list[dict], percentages: Dict[str, float]) -> list[str]:
+    notes: list[str] = []
+    for label, detail in elements.get("attention", {}).items():
+        if detail["status"] == "healthy":
+            continue
+        low, high = detail["ideal_range"]
+        notes.append(f"{label} gets {detail['attention_pct']:.0f}% of attention ({detail['status']}; healthy is {low:.0f}-{high:.0f}%).")
+    if missing:
+        notes.append("Missing elements: " + ", ".join(missing) + ".")
+    if order:
+        notes.append("Attention order: " + " > ".join(order) + ".")
+    background = percentages.get(BACKGROUND_LABEL, 0.0)
+    if background > 25:
+        notes.append(f"{background:.0f}% of attention falls outside the marked elements (background or clutter).")
+    for item in text:
+        if item["contrast_ratio"] < 3:
+            notes.append(f"{item['label']} contrast is about {item['contrast_ratio']:.1f}:1, below the 3:1 minimum for large text.")
+        if item["size_score"] < 60:
+            notes.append(f"{item['label']} is small: {item['height_share'] * 100:.1f}% of the poster height.")
+    if not notes:
+        notes.append("All measured components are in healthy ranges.")
+    return notes
 
 
 def calculate_pes(
     percentages: Dict[str, float],
     aoi_records: Iterable[Any],
+    image: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Calculate Poster Effectiveness Score from AOI attention analytics.
+    """Calculate PES from attention shares (incl. Background), AOIs and, optionally, the image."""
+    boxes = _boxes(aoi_records)
+    labels = _present_labels(boxes)
 
-    Accepts either AOIRecord objects or legacy (label, x1, y1, x2, y2) tuples.
-    """
-    component_scores = {
-        "Product Attention": score_for_ideal_range(
-            percentages.get("Product", 0), *IDEAL_ATTENTION_RANGES["Product"]
-        ),
-        "CTA Visibility": score_for_ideal_range(
-            percentages.get("CTA", 0), *IDEAL_ATTENTION_RANGES["CTA"]
-        ),
-        "Headline Engagement": score_for_ideal_range(
-            percentages.get("Headline", 0), *IDEAL_ATTENTION_RANGES["Headline"]
-        ),
-        "Attention Balance": calculate_balance_score(percentages, aoi_records),
-        "Visual Hierarchy": calculate_hierarchy_score(percentages, aoi_records),
+    fit, attention_details = attention_fit(percentages, labels)
+    hierarchy, order = visual_hierarchy(percentages, labels)
+    complete, missing = completeness(labels)
+    read, text_details = readability(image, boxes)
+    raw = {
+        "Attention Fit": fit,
+        "Visual Hierarchy": hierarchy,
+        "Focus": focus(percentages, labels) if labels else None,
+        "Completeness": complete,
+        "Readability": read,
     }
-
-    score = sum(component_scores[name] * weight / 100 for name, weight in PES_WEIGHTS.items())
-
+    measured = {name: value for name, value in raw.items() if value is not None}
+    used_weight = sum(PES_WEIGHTS.get(name, 0.0) for name in measured)
+    effective_weights = {
+        name: (PES_WEIGHTS.get(name, 0.0) / used_weight * 100 if name in measured and used_weight else 0.0)
+        for name in PES_WEIGHTS
+    }
+    score = sum(measured[name] * effective_weights[name] / 100 for name in measured) if used_weight else 0.0
+    components = {name: round(value, 2) for name, value in measured.items()}
+    elements = {"attention": attention_details, "missing": missing, "attention_order": order, "text": text_details}
     return {
-        "score": clamp(score),
+        "version": PES_VERSION,
+        "score": round(clamp(score), 2),
         "category": get_pes_category(score),
-        "components": component_scores,
-        "weights": PES_WEIGHTS,
-        "insights": build_design_insights(percentages, aoi_records, component_scores),
+        "components": components,
+        "weights": {name: round(weight, 2) for name, weight in effective_weights.items() if name in measured},
+        "configured_weights": PES_WEIGHTS,
+        "not_measured": [name for name, value in raw.items() if value is None],
+        "elements": elements,
+        "insights": _insights(components, elements, order, missing, text_details, percentages),
     }

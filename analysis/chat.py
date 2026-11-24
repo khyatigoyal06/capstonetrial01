@@ -16,6 +16,7 @@ import httpx
 import numpy as np
 
 from config.settings import (
+    CHAT_MAX_HISTORY_TURNS,
     GROQ_API_KEY,
     GROQ_BASE_URL,
     GROQ_IMAGE_MAX_EDGE,
@@ -35,8 +36,10 @@ class ChatUpstreamError(RuntimeError):
 
 SYSTEM_PROMPT = """You are a poster design consultant for food and beverage advertising.
 
-You are given a poster image plus a Poster Effectiveness Score (PES) analysis \
-computed by a YOLOv8 detector and a saliency-based attention model.
+You are given a poster image plus a Poster Effectiveness Score (PES v2) analysis \
+computed by a YOLOv8 detector and an attention model (saliency estimate, or \
+measured eye-tracking when stated). PES v2 components: Attention Fit, Visual \
+Hierarchy, Focus, Completeness and Readability (WCAG text contrast and size).
 
 Ground rules:
 - The supplied numbers are authoritative. Never recompute, re-estimate, or \
@@ -114,6 +117,22 @@ def build_analysis_digest(analysis: dict[str, Any]) -> str:
         lines.append("Rule-based findings:")
         lines.extend(f"  - {item}" for item in insights)
 
+    for item in (pes.get("elements") or {}).get("text") or []:
+        lines.append(f"Text readability - {item['label']}: contrast {item['contrast_ratio']:.1f}:1, "
+                     f"height {item['height_share'] * 100:.1f}% of poster")
+
+    recs = analysis.get("recommendations") or []
+    if recs:
+        lines.append("Ranked recommendations (PES points available):")
+        for rec in recs[:6]:
+            if isinstance(rec, dict):
+                lines.append(f"  - {rec.get('title')} (+{rec.get('impact', 0):.1f}): {rec.get('detail')}")
+            else:
+                lines.append(f"  - {rec}")
+
+    if str(analysis.get("attention_source", "")).startswith(("gaze", "webgazer")):
+        lines.append("Attention was MEASURED with webcam eye tracking for this poster.")
+
     return "\n".join(lines)
 
 
@@ -148,11 +167,14 @@ def build_messages(
         }
     )
 
-    for turn in history:
-        role = turn.get("role")
-        content = (turn.get("content") or "").strip()
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
+    # Only the most recent turns are resent; an unbounded history grows every
+    # request until it hits the model's context limit (and costs tokens).
+    recent = [
+        turn for turn in history
+        if turn.get("role") in ("user", "assistant") and (turn.get("content") or "").strip()
+    ][-CHAT_MAX_HISTORY_TURNS:]
+    for turn in recent:
+        messages.append({"role": turn["role"], "content": turn["content"].strip()[:4000]})
 
     messages.append({"role": "user", "content": user_message})
     return messages
@@ -177,6 +199,23 @@ def list_models() -> list[str]:
     return sorted(item["id"] for item in payload.get("data", []) if "id" in item)
 
 
+# Vision models to try, in order, if the configured one has been retired.
+FALLBACK_VISION_MODELS = ("qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "meta-models/muse-spark-open")
+_active_model: str | None = None
+
+
+def _post_chat(model: str, messages: list[dict[str, Any]]) -> httpx.Response:
+    try:
+        return httpx.post(
+            f"{GROQ_BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={"model": model, "messages": messages, "max_tokens": GROQ_MAX_TOKENS, "temperature": 0.6},
+            timeout=GROQ_TIMEOUT_SECONDS,
+        )
+    except httpx.HTTPError as exc:
+        raise ChatUpstreamError(f"Could not reach Groq: {exc}") from exc
+
+
 def ask(
     analysis: dict[str, Any],
     history: Iterable[dict[str, str]],
@@ -184,31 +223,28 @@ def ask(
     image_data_uri: str | None = None,
 ) -> str:
     """Send one grounded chat turn to Groq and return the reply text."""
+    global _active_model
     if not is_configured():
         raise ChatConfigError(
             "GROQ_API_KEY is not set. Add it to a .env file in the project root "
             "to enable the suggestion assistant."
         )
 
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": build_messages(analysis, history, user_message, image_data_uri),
-        "max_tokens": GROQ_MAX_TOKENS,
-        "temperature": 0.6,
-    }
-
-    try:
-        response = httpx.post(
-            f"{GROQ_BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=GROQ_TIMEOUT_SECONDS,
-        )
-    except httpx.HTTPError as exc:
-        raise ChatUpstreamError(f"Could not reach Groq: {exc}") from exc
+    messages = build_messages(analysis, history, user_message, image_data_uri)
+    model = _active_model or GROQ_MODEL
+    response = _post_chat(model, messages)
+    if response.status_code == 404:
+        # Groq rotates models; fall back to another vision model the key can reach.
+        try:
+            available = set(list_models())
+        except (ChatUpstreamError, ChatConfigError):
+            available = set()
+        for candidate in FALLBACK_VISION_MODELS:
+            if candidate != model and candidate in available:
+                retry = _post_chat(candidate, messages)
+                if retry.status_code < 400:
+                    _active_model, response = candidate, retry
+                    break
 
     if response.status_code == 401:
         raise ChatConfigError("Groq rejected the API key (401). Check GROQ_API_KEY.")

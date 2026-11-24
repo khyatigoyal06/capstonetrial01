@@ -1,0 +1,7 @@
+# Development, testing and legacy tools (not needed to run the server).
+-r requirements.txt
+pytest==9.2.0
+pandas==3.1.1
+matplotlib==3.11.2
+# Legacy Streamlit prototype in legacy/ (optional)
+streamlit==1.67.0

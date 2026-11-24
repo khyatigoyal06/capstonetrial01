@@ -4,7 +4,7 @@ import io
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # repository root
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -190,7 +190,12 @@ if analyze_gaze:
                     writer.writerow([k, v])
                 st.download_button("Download attention CSV", data=csv_buf.getvalue(), file_name="attention.csv", mime="text/csv")
                 # Build recommendations and LLM template
-                recs = build_recommendations(result["attention_scores"], records, {"overall_score": 0})
+                from analysis.attention import calculate_attention_percentages
+                from analysis.recommendations import recommendation_texts
+                from analysis.scoring import calculate_pes
+
+                percentages = calculate_attention_percentages(result["attention_scores"], records)
+                recs = recommendation_texts(build_recommendations(calculate_pes(percentages, records), percentages))
                 st.subheader("Recommendations")
                 for r in recs:
                     st.write("- ", r)

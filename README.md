@@ -1,128 +1,149 @@
-# Capstone — Advertisement Poster Analysis
+# Poster PES Analyzer
 
-Upload a food & beverage poster, detect its design elements with YOLOv8, and get a
-Poster Effectiveness Score (PES) plus a grounded chat assistant for improvements.
+Analyse a food & beverage advertisement poster and get a **Poster Effectiveness
+Score (PES)**, where people look (estimated or measured with a webcam eye
+tracker), how readable the text is, and a ranked list of concrete fixes.
 
-Prerequisites
-- Python 3.10+
-- Node 18+ (for the React frontend)
-- Recommended: create a virtualenv and install `pip install -r requirements.txt`.
+| Mode | What it does |
+|---|---|
+| **Poster review** | YOLOv8 finds the Product, Headline, CTA, Price and logo; a colour-aware saliency model estimates attention; PES v2 + recommendations; chat assistant; PDF report. |
+| **Live eye-tracking study** | Webcam gaze engine (ETH-XGaze + head pose) with a positioning guide, automatic dwell calibration, held-out accuracy check and drift correction. Shows a fixation heatmap right after you stop. |
+| **Analyze gaze file** | Upload a study CSV (or a Tobii export) and the poster: fixations, measured attention per element, PES, and how well the saliency estimate matched real gaze. |
 
-Key components
-- `api/main.py` — FastAPI backend (poster and gaze analysis, WebGazer capture page, chat).
-- `frontend/` — React + Vite UI with poster review, live WebGazer study, and gaze-file analysis modes.
-- `analysis/` — modular analysis helpers (poster, gaze, attention, detection, saliency, scoring, chat).
-- `models/detector.py` — YOLO inference helpers.
-- `training/` — `split_dataset.py`, `train.py`, and `inference.py` using Ultralytics YOLOv8.
-- `aoi_visualizer.py` — legacy CLI for poster AOI preview and gaze analysis.
+Every analysis is saved locally (SQLite) and listed under **Recent analyses**,
+so you can reopen it, chat about it or export the PDF later.
 
-## How the PES score is computed
+## Quick start
 
-1. **Detect AOIs** — YOLOv8 returns boxes classed `Product`, `Headline`, `CTA`,
-   `Price`, `logo`.
-2. **Estimate attention** — `analysis/saliency.py` builds a spectral-residual
-   saliency map with a centre-bias prior, then assigns saliency mass to AOIs
-   using a smallest-box-wins ownership rule so overlapping boxes cannot
-   double-count. This replaces box-area as the attention proxy, so a small
-   high-contrast CTA can out-score a large flat logo.
-3. **Score five components** (0–100 each) in `analysis/scoring.py`:
-   Product Attention, CTA Visibility, and Headline Engagement are scored against
-   ideal attention bands; Attention Balance rewards coverage and penalises
-   one-element dominance; Visual Hierarchy checks that Product leads with
-   Headline and CTA close behind.
-4. **Weighted sum** using the weights in `config/scoring.yaml` (sums to 100).
-5. **Category** — ≥80 Excellent, ≥65 Good, ≥50 Average, else Needs Improvement.
+**Windows, one click:** double-click `scripts\start_windows.bat`. It finds
+Python 3.10-3.12, installs everything into `.venv`, builds the frontend, stops
+any old server on port 8001, opens <http://localhost:8001> and logs to
+`server.log`. Delete `.venv\.deps_ok` to force a dependency reinstall.
 
-All bands, weights, and category cut-offs live in `config/scoring.yaml`, so they
-can be tuned without touching code.
+**Manual (any OS):**
 
-**Caveat:** the bands and weights are design heuristics, not values validated
-against real advertising performance. PES measures internal design quality, not
-predicted click-through. Grounding it properly means calibrating against real
-gaze data — `webgazer_choose_poster.html` collects that.
+```bash
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                   # Python 3.10-3.12 (MediaPipe / PyTorch)
+cd frontend && npm ci && npm run build && cd ..
+python -m uvicorn api.main:app --port 8001
+```
+
+Open <http://localhost:8001>. For frontend development run `npm run dev` in
+`frontend/` (port 5173; it proxies `/api`, including the gaze WebSocket, to 8001).
+
+**Docker:** `docker compose up --build`, then <http://localhost:8001>. The image
+uses CPU-only PyTorch; history and model downloads live in named volumes.
 
 ## Configuration
 
-Copy `.env.example` to `.env` (gitignored) and fill in:
+Copy `.env.example` to `.env`. The main settings:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GROQ_API_KEY` | – | Enables the chat assistant (server-side only). |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` | Vision model; falls back automatically if Groq retires it. |
+| `MODEL_WEIGHTS` | `models/weights/best.pt` | YOLO checkpoint. |
+| `DETECTION_CONFIDENCE` | `0.25` | Detector threshold. |
+| `GAZE_CAMERA_HFOV_DEG` | `70` | Webcam field of view guess (the study page can also correct distance per camera). |
+| `MAX_UPLOAD_MB` | `20` | Upload limit. |
+| `METRICS_PORT` | `8000` | Prometheus endpoint; `0` disables. |
+
+## How PES v2 is computed
+
+PES is the weighted mean of five 0-100 components (weights in
+`config/scoring.yaml`):
+
+| Component | Weight | Measures |
+|---|---|---|
+| Attention Fit | 30 | Each element's attention share against a healthy band (Product 30-45 %, Headline 15-30 %, CTA 10-20 %, Price 5-15 %, logo 3-10 %), weighted by importance. |
+| Visual Hierarchy | 20 | Pairwise agreement between observed attention order and the expected order (Product → Headline/CTA → Price → logo). |
+| Focus | 15 | Little attention lost to background; no single element taking > 60 %. |
+| Completeness | 15 | Which key elements exist (Product 35, Headline 25, CTA 25, logo 10, Price 5 points). |
+| Readability | 20 | WCAG contrast ratio of each text element's two dominant colours (target 4.5:1) and text size. |
+
+A component that cannot be measured (e.g. Readability with no text elements) is
+left out and the other weights rescaled. Categories: ≥ 80 Excellent, ≥ 65 Good,
+≥ 50 Average. Recommendations are ranked by **impact** = the PES points the fix
+could win back.
+
+Changes from v1: a missing CTA now costs its Completeness share instead of
+zeroing a 20-point component; Price and logo are scored; readability is new;
+hierarchy uses pairwise order agreement instead of fixed rank bonuses.
+
+**Caveat:** bands and weights are design heuristics, not fitted to sales or
+click data. Attention in Poster review is an *estimate*; validate it against
+real gaze with `tools/validate_saliency.py` before relying on it.
+
+## Eye tracking: the gaze engine
+
+`gaze_engine/` runs on the API; the browser only captures frames and shows
+targets.
 
 ```
-GROQ_API_KEY=gsk_...        # enables the chat assistant
-GROQ_MODEL=...              # optional; see GET /api/chat/models
-MODEL_WEIGHTS=...           # optional; defaults to models/weights/best.pt
+webcam frame (720p) ──WebSocket──▶ /api/gaze/stream
+  MediaPipe Face Landmarker → solvePnP head pose (real camera intrinsics)
+  → data normalisation → ETH-XGaze ResNet-18 → 3D gaze direction
+  → gaze ray from the 3D face centre ∩ camera plane      (head-pose aware)
+  → per-user affine/quadratic map (leave-one-target-out CV) → screen px
+  → One-Euro filter → fixations (I-DT) → Gaussian AOI attention
 ```
 
-The Groq key is read server-side only and is never sent to the browser. Groq
-rotates its hosted models, so if the default model returns 404, start the API and
-call `GET /api/chat/models` to list the ids your key can reach.
+Study flow: positioning guide (distance 45-70 cm, centred, facing the screen;
+one-time "I'm at 50 cm" distance correction per webcam) → camera exposure and
+white balance locked → 13 dwell-captured calibration dots (worst ones
+re-measured) → 8 held-out accuracy dots (a missed dot is re-checked) →
+recording, with a drift check every 20 s or immediately when the head moves.
+Drift is corrected retroactively when gradual; samples after a head movement
+are dropped. Recording is blocked when accuracy is poor.
 
-Notes
-- The repository currently includes `models/weights/best.pt` and `models/weights/best_640_baseline.pt`. Set `MODEL_WEIGHTS` to use a different checkpoint.
-- The poster capture page is `webgazer_choose_poster.html`; the main React app embeds it in Live WebGazer Study and accepts its CSV output in Analyze Gaze File. Its gaze-model selector now includes **Custom eye tracker · iris geometry**, which uses the standalone tracker's normalized iris/eye features with the page's poster-aware calibration, validation, AOI mapping, and CSV export. The existing MPIIFaceGaze estimator remains available as a fallback. Custom-mode frames are processed in the browser; it does not launch the standalone OpenCV fullscreen window.
-- The standalone tracker previously measured a high held-out error (about 400 px median on four test locations), so the poster page keeps its independent validation gate and will not start recording if the selected model fails that check. Treat the custom model as experimental until it passes a fresh session validation; do not lower the gate to make recording start.
+Realistic accuracy: about 1.5-3° (60-120 px on a laptop) after calibration.
+Large elements are measured reliably; elements smaller than the session's
+error are flagged "approximate" instead of reported with false precision.
+Click **↓ Report** after each session and run `python tools/gaze_benchmark.py <folder>`
+to get pooled accuracy across participants.
 
-## Run the integrated web prototype
+## Research and evaluation tools
 
-For local development, start the API and Vite in separate terminals from `cap-new/`:
+| Command | Output |
+|---|---|
+| `python training/evaluate.py` | Per-class precision, recall, mAP@0.5 and mAP@0.5:0.95 of the detector on the validation split (`reports/detector_eval.md`). |
+| `python training/dataset_report.py` | Images and boxes per class and split, box sizes, label problems. |
+| `python tools/validate_saliency.py <csv-folder>` | Correlation and error between saliency-estimated and gaze-measured attention across sessions. |
+| `python tools/gaze_benchmark.py <report-folder>` | Pooled eye-tracker accuracy from study reports. |
+| `python training/train.py --epochs 100 --copy-weights` | Retrain the detector. |
 
-```powershell
-python -m uvicorn api.main:app --reload --port 8001
-```
-
-```powershell
-cd frontend
-npm ci
-npm run dev
-```
-
-Open `http://localhost:5173`. The app has three modes: **Poster Review** (YOLO + estimated saliency), **Live WebGazer Study** (camera capture and CSV download), and **Analyze Gaze File** (upload a poster and CSV/TSV for gaze heatmaps, AOI attention, PES, and recommendations).
-
-To run the built React app and API together in one container, use `docker compose up --build` and open `http://localhost:8001`. The WebGazer page uses the existing capture implementation and its external browser libraries; camera permission is required for live collection.
-
-Quick commands
-
-Run the smoke test suite:
-```
-python -m pytest -q
-```
-
-Run inference (requires a `.pt` checkpoint):
-```
-python training/inference.py --weights path/to/best.pt --source path/to/poster.jpg --out inference_out
-```
-
-Start training (requires `ultralytics`):
-```
-python training/train.py --data Capstone.yolov8/data.yaml --epochs 50
-```
-
-Run the Streamlit app (local):
-```
-pip install -r requirements.txt
-streamlit run app/app.py
-```
-
-Build Docker image:
-```
-docker build -t capstone-poster:latest .
-```
-
-Run tests locally:
-```
-python -m pytest -q
-```
-
-CI and deployment notes
------------------------
-- To enable the CI workflow to push Docker images, add the following repository secrets in GitHub:
-	- `DOCKERHUB_USERNAME` — your Docker Hub user name
-	- `DOCKERHUB_TOKEN` — a Docker Hub access token (not your password)
-
-- To run production Compose, set `MODEL_WEIGHTS` and `DOCKER_IMAGE` env vars, for example:
+## Project structure
 
 ```
-export MODEL_WEIGHTS=/path/to/best.pt
-export DOCKER_IMAGE=myuser/capstone-poster:latest
-docker compose -f docker-compose.prod.yml up -d --build
+api/main.py            FastAPI: analysis, gaze stream, chat, history, PDF
+analysis/              detection, saliency, scoring (PES v2), readability,
+                       recommendations, fixations, gaze parsing, chat, store
+gaze_engine/           webcam gaze engine (backend, calibration, session, filters)
+frontend/              React + Vite app (src/components/*)
+webgazer_choose_poster.html   study capture page (served at /api/gaze/capture)
+config/                settings.py (env), scoring.yaml (PES weights and bands)
+models/                YOLO wrapper + weights
+training/              train, evaluate, dataset report, split, inference
+tools/                 gaze benchmark, saliency validation
+tests/                 pytest suite (run: python -m pytest -q)
+legacy/                old Streamlit app and CLI, kept for reference
+custom_eye_tracker/    superseded standalone iris tracker (reference only)
 ```
 
-Security note: Do not commit trained weights to the repository; reference them via environment variables or an external artifact store.
+## Tests and CI
+
+`python -m pytest -q` runs the backend suite (no GPU, webcam or model downloads
+needed; the heavy models are faked). GitHub Actions runs the tests with
+CPU PyTorch, builds the frontend and the Docker image, and pushes the image
+only when `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` secrets are set.
+
+## Known limitations
+
+- The detector was trained on 63 images (11 validation); CTA and Price are the
+  rarest classes. More labelled posters will help more than any code change.
+- No held-out test split yet, so detector numbers are validation numbers.
+- Readability uses two-colour clustering inside each box; photos or gradients
+  behind text make the contrast estimate approximate.
+- Webcam eye tracking cannot match an infrared tracker; treat small-element
+  attention as approximate.

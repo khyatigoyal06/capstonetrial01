@@ -1,23 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import csv
 import json
 import math
 import io
 import re
+import struct
 import sys
 import tempfile
+import time
 import uuid
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -27,18 +30,31 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from analysis import chat
-from analysis.aoi import AOIRecord, build_aoi_record, draw_aoi_boxes
+from analysis.aoi import AOIRecord, build_aoi_record, draw_aoi_boxes, parse_yolo_labels
 from analysis.attention import simple_heatmap
 from analysis.detection import detect_poster_elements
 from analysis.gaze import GazeAnalyzer, parse_gaze_points
-from analysis.pretrained_gaze import PretrainedGazeError, pretrained_gaze_estimator
+from analysis.fixations import render_fixation_map
+from analysis.gaze_session import analyze_engine_session, fixations_from_stats, load_engine_session
 from analysis.recommendations import build_recommendations
 from analysis.saliency import (
     attention_percentages_from_saliency,
     saliency_heatmap_overlay,
 )
-from analysis.scoring import calculate_pes, score_poster
-from config.settings import CLASS_NAMES, DATASET_IMAGE_DIR, GROQ_MODEL
+from analysis.scoring import calculate_pes
+from analysis.store import AnalysisStore
+from config.settings import (
+    CHAT_RATE_LIMIT_PER_MINUTE,
+    CLASS_NAMES,
+    DATASET_IMAGE_DIR,
+    DEFAULT_MODEL_WEIGHTS,
+    GROQ_MODEL,
+    MAX_UPLOAD_MB,
+)
+from utils.pdf_export import build_analysis_pdf
+from gaze_engine import config as gaze_config
+from gaze_engine.backend import GazeBackendError, backend_availability, get_backend
+from gaze_engine.session import GazeSession
 from models.detector import ModelNotFoundError
 from monitoring.metrics import (
     gaze_analysis_requests,
@@ -53,7 +69,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Poster PES API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Poster PES API", version="0.3.0", lifespan=lifespan)
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
 app.add_middleware(
@@ -70,19 +86,46 @@ app.add_middleware(
 
 @app.middleware("http")
 async def observe_request_duration(request, call_next):
-    import time
-
     started = time.perf_counter()
     response = await call_next(request)
     processing_seconds.observe(time.perf_counter() - started)
     return response
 
-# Analyses are kept in-process so the chat turn can reference the poster and its
-# numbers without the browser re-uploading either. Bounded because this is a
-# long-running server, not a request-scoped cache; a restart clears it, which is
-# acceptable for a single-node deployment.
-_MAX_CACHED_ANALYSES = 32
-_analyses: OrderedDict[str, dict[str, Any]] = OrderedDict()
+# Analyses are stored in SQLite (data/analyses.sqlite3) so chat, PDF reports
+# and history keep working after a restart.
+_store: AnalysisStore | None = None
+
+
+def get_store() -> AnalysisStore:
+    global _store
+    if _store is None:
+        _store = AnalysisStore()
+    return _store
+
+
+# Simple per-client limit so a public deployment cannot burn the Groq key.
+_chat_calls: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _check_chat_rate(client: str) -> None:
+    now = time.monotonic()
+    calls = _chat_calls[client]
+    while calls and now - calls[0] > 60:
+        calls.popleft()
+    if len(calls) >= CHAT_RATE_LIMIT_PER_MINUTE:
+        raise HTTPException(status_code=429, detail="Too many chat messages; wait a minute and try again.")
+    calls.append(now)
+
+
+async def read_upload(upload: UploadFile, what: str) -> bytes:
+    """Read an upload, refusing anything over MAX_UPLOAD_MB."""
+    limit = int(MAX_UPLOAD_MB * 1024 * 1024)
+    data = await upload.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"The {what} is larger than {MAX_UPLOAD_MB:g} MB.")
+    if not data:
+        raise HTTPException(status_code=400, detail=f"The {what} is empty.")
+    return data
 
 
 class ChatRequest(BaseModel):
@@ -93,8 +136,14 @@ class ChatRequest(BaseModel):
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    gaze_ok, gaze_reason = backend_availability()
     return {
         "status": "ok",
+        "version": app.version,
+        "detector_weights": DEFAULT_MODEL_WEIGHTS.name,
+        "detector_available": DEFAULT_MODEL_WEIGHTS.is_file(),
+        "gaze_engine_available": gaze_ok,
+        "gaze_engine_reason": gaze_reason,
         "chat_configured": chat.is_configured(),
         "chat_model": GROQ_MODEL,
     }
@@ -116,12 +165,11 @@ async def analyze_poster(file: UploadFile = File(...)) -> dict:
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Upload a valid image file.")
 
-    image_bytes = await file.read()
-    image = decode_image(image_bytes)
+    image = decode_image(await read_upload(file, "poster"))
     inference_requests.inc()
 
     try:
-        records, source = detect_poster_elements(image, conf=0.25)
+        records, source = detect_poster_elements(image)
     except ModelNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
@@ -133,31 +181,20 @@ async def analyze_poster(file: UploadFile = File(...)) -> dict:
     # Attention share drives PES, so it is estimated from saliency rather than
     # box area — see analysis/saliency.py for why.
     percentages = attention_percentages_from_saliency(image, records)
-    pes = calculate_pes(percentages, records)
-    legacy_scores = score_poster(records, percentages)
-    recommendations = build_recommendations(percentages, records, legacy_scores)
+    pes = calculate_pes(percentages, records, image)
 
-    analysis_id = uuid.uuid4().hex
     payload = {
-        "analysis_id": analysis_id,
+        "analysis_id": uuid.uuid4().hex,
         "filename": file.filename,
         "source": source,
+        "attention_source": "saliency_estimate",
         "detections": [record.to_dict() for record in records],
-        "pes": {
-            "mode": "saliency_attention",
-            "score": pes["score"],
-            "category": pes["category"],
-            "components": pes["components"],
-            "weights": pes["weights"],
-            "insights": pes["insights"],
-            "attention_percentages": percentages,
-        },
-        "recommendations": recommendations,
+        "pes": {**pes, "mode": "saliency_attention", "attention_percentages": percentages},
+        "recommendations": build_recommendations(pes, percentages),
         "annotated_image": encode_annotated_image(image, records),
         "saliency_image": encode_image_data_uri(saliency_heatmap_overlay(image)),
     }
-
-    _remember_analysis(analysis_id, payload, image)
+    _remember_analysis(payload, image)
     return payload
 
 
@@ -174,10 +211,8 @@ async def analyze_gaze(
     if not gaze_name.endswith((".csv", ".tsv")):
         raise HTTPException(status_code=400, detail="Upload a gaze export in CSV or TSV format.")
 
-    image = decode_image(await image_file.read())
-    gaze_bytes = await gaze_file.read()
-    if not gaze_bytes:
-        raise HTTPException(status_code=400, detail="The gaze file is empty.")
+    image = decode_image(await read_upload(image_file, "poster"))
+    gaze_bytes = await read_upload(gaze_file, "gaze file")
 
     inference_requests.inc()
     gaze_analysis_requests.inc()
@@ -196,13 +231,22 @@ async def analyze_gaze(
         detection_source = "study_annotations"
     else:
         try:
-            records, detection_source = detect_poster_elements(image, conf=0.25)
+            records, detection_source = detect_poster_elements(image)
         except ModelNotFoundError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Poster detection failed: {exc}") from exc
 
     suffix = ".tsv" if gaze_name.endswith(".tsv") else ".csv"
+    engine_session = load_engine_session(gaze_bytes, delimiter="\t" if suffix == ".tsv" else ",")
+    if engine_session is not None:
+        attention_ms, stats, points = analyze_engine_session(engine_session, records, image.shape)
+        heatmap = render_fixation_map(image, fixations_from_stats(stats), stats["quality"]["sigma_image_px"])
+        return _gaze_payload(
+            image_file.filename, image, records, detection_source, attention_ms, stats, points,
+            attention_source="gaze_engine_fixations", heatmap_image=heatmap,
+        )
+
     gaze_temp_path: Path | None = None
     try:
         # Close the temp handle before the existing path-based parser reopens
@@ -221,35 +265,78 @@ async def analyze_gaze(
         if gaze_temp_path is not None:
             gaze_temp_path.unlink(missing_ok=True)
 
-    percentages = _attention_percentages(analyzer.attention_scores)
-    pes = calculate_pes(percentages, records)
-    legacy_scores = score_poster(records, percentages)
-    recommendations = build_recommendations(percentages, records, legacy_scores)
-    analysis_id = uuid.uuid4().hex
+    return _gaze_payload(
+        image_file.filename, image, records, detection_source, analyzer.attention_scores, stats, points,
+        attention_source="webgazer_gaze",
+    )
+
+
+def _gaze_payload(
+    filename: str | None,
+    image: np.ndarray,
+    records: list[AOIRecord],
+    detection_source: str,
+    attention_scores: dict[str, float],
+    stats: dict[str, Any],
+    points: list[tuple[int, int, float]],
+    *,
+    attention_source: str,
+    heatmap_image: np.ndarray | None = None,
+) -> dict[str, Any]:
+    percentages = _attention_percentages(attention_scores)
+    pes = calculate_pes(percentages, records, image)
+    recommendations = build_recommendations(pes, percentages)
+    comparison = attention_comparison(percentages, attention_percentages_from_saliency(image, records))
+    quality = stats.get("quality") or {}
+    insights = list(pes["insights"])
+    unreliable = quality.get("unreliable_aois") or []
+    if unreliable:
+        insights.append(
+            "Gaze accuracy in this session is too coarse to measure "
+            + ", ".join(unreliable)
+            + " reliably; treat their attention share as approximate."
+        )
+    if quality.get("session_quality") == "fair":
+        insights.append("This session passed validation with fair (not good) accuracy; small elements are approximate.")
+    stats = {key: value for key, value in stats.items() if key != "fixation_list"} | (
+        {"fixation_count": len(stats.get("fixation_list") or [])} if "fixation_list" in stats else {}
+    )
     payload = {
-        "analysis_id": analysis_id,
-        "filename": image_file.filename,
+        "analysis_id": uuid.uuid4().hex,
+        "filename": filename,
         "source": detection_source,
-        "attention_source": "webgazer_gaze",
+        "attention_source": attention_source,
         "detections": [record.to_dict() for record in records],
         "gaze_stats": stats,
+        "gaze_quality": quality or None,
         "gaze_sample_count": len(points),
-        "attention_scores_ms": analyzer.attention_scores,
-        "pes": {
-            "mode": "webgazer_gaze",
-            "score": pes["score"],
-            "category": pes["category"],
-            "components": pes["components"],
-            "weights": pes["weights"],
-            "insights": pes["insights"],
-            "attention_percentages": percentages,
-        },
+        "attention_scores_ms": {label: round(float(value), 1) for label, value in attention_scores.items()},
+        "attention_comparison": comparison,
+        "pes": {**pes, "mode": attention_source, "insights": insights, "attention_percentages": percentages},
         "recommendations": recommendations,
         "annotated_image": encode_annotated_image(image, records),
-        "saliency_image": encode_image_data_uri(encode_gaze_heatmap(image, points)),
+        "saliency_image": encode_image_data_uri(
+            heatmap_image if heatmap_image is not None else encode_gaze_heatmap(image, points)
+        ),
     }
-    _remember_analysis(analysis_id, payload, image)
+    _remember_analysis(payload, image)
     return payload
+
+
+def attention_comparison(measured: dict[str, float], predicted: dict[str, float]) -> dict[str, Any]:
+    """How well the saliency estimate (Poster Review mode) matched measured gaze."""
+    labels = sorted(set(measured) | set(predicted))
+    m = np.array([measured.get(label, 0.0) for label in labels])
+    p = np.array([predicted.get(label, 0.0) for label in labels])
+    correlation = None
+    if len(labels) >= 3 and m.std() > 0 and p.std() > 0:
+        correlation = round(float(np.corrcoef(m, p)[0, 1]), 3)
+    return {
+        "measured": {label: round(float(v), 2) for label, v in zip(labels, m)},
+        "predicted": {label: round(float(v), 2) for label, v in zip(labels, p)},
+        "mean_abs_error_pct": round(float(np.mean(np.abs(m - p))), 2) if labels else None,
+        "pearson_r": correlation,
+    }
 
 
 def _records_from_study_annotations(raw_annotations: str, image_shape: tuple[int, ...]) -> list[AOIRecord]:
@@ -364,6 +451,10 @@ def gaze_capture_page() -> HTMLResponse:
             if Path(str(poster.get("name", ""))).name == poster.get("name")
             and any((dataset_root / split / "images" / poster["name"]).is_file() for split in ("train", "valid", "test"))
         ]
+        for poster in available:
+            refreshed = _gallery_aois_from_labels(dataset_root, poster)
+            if refreshed is not None:
+                poster["aois"] = refreshed
         page = gallery_pattern.sub(
             lambda found: f"{found.group(1)}{json.dumps(available, ensure_ascii=False)}{found.group(3)}",
             page,
@@ -374,35 +465,162 @@ def gaze_capture_page() -> HTMLResponse:
     return HTMLResponse(page)
 
 
+def get_gaze_backend():
+    """Indirection so tests can substitute a fake backend."""
+    return get_backend()
+
+
+@app.get("/api/gaze/engine")
+def gaze_engine_status() -> dict[str, Any]:
+    available, reason = backend_availability()
+    return {"available": available, "reason": reason, "mode": gaze_config.GAZE_ENGINE_MODE}
+
+
 @app.post("/api/gaze/predict")
 async def predict_gaze(frame: UploadFile = File(...)) -> dict[str, Any]:
-    """Estimate a local gaze-direction feature vector from one camera frame."""
+    """Run the gaze engine on one camera frame (uncalibrated; for diagnostics)."""
     if not frame.content_type or not frame.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Send a JPEG or PNG camera frame.")
     image_bytes = await frame.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="The camera frame is empty.")
+    image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="The camera frame could not be decoded.")
     try:
-        return pretrained_gaze_estimator.predict(image_bytes)
-    except PretrainedGazeError as exc:
+        observation = await asyncio.to_thread(get_gaze_backend().process, image)
+    except GazeBackendError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return observation.to_dict()
+
+
+@app.websocket("/api/gaze/stream")
+async def gaze_stream(websocket: WebSocket) -> None:
+    """Live calibrated gaze.
+
+    Binary messages are frames: 8-byte little-endian float64 capture time (ms)
+    followed by JPEG bytes. Text messages are JSON control messages, see
+    gaze_engine/session.py. The client sends the next frame only after it gets
+    the reply to the previous one, so throughput adapts to the CPU.
+    """
+    await websocket.accept()
+    session = GazeSession()
+    try:
+        backend = get_gaze_backend()
+        await websocket.send_json({"type": "status", "stage": "loading_model"})
+        warm_up = getattr(backend, "warm_up", None)
+        if warm_up is not None:
+            await asyncio.to_thread(warm_up)
+        await websocket.send_json({"type": "status", "stage": "model_ready"})
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            if message.get("bytes") is not None:
+                data = message["bytes"]
+                if len(data) <= 8:
+                    await websocket.send_json({"type": "error", "detail": "frame message too short"})
+                    continue
+                (t_ms,) = struct.unpack("<d", data[:8])
+                image = cv2.imdecode(np.frombuffer(data[8:], np.uint8), cv2.IMREAD_COLOR)
+                if image is None:
+                    await websocket.send_json({"type": "gaze", "t": t_ms, "valid": False, "reason": "bad_frame"})
+                    continue
+                started = time.perf_counter()
+                observation = await asyncio.to_thread(backend.process, image)
+                reply = session.handle_frame(observation, t_ms)
+                reply["proc_ms"] = round((time.perf_counter() - started) * 1000, 1)
+                await websocket.send_json(reply)
+            elif message.get("text") is not None:
+                try:
+                    control = json.loads(message["text"])
+                except json.JSONDecodeError:
+                    await websocket.send_json({"type": "error", "detail": "invalid JSON"})
+                    continue
+                for reply in session.handle_control(control if isinstance(control, dict) else {}):
+                    await websocket.send_json(reply)
+    except GazeBackendError as exc:
+        await websocket.send_json({"type": "error", "fatal": True, "detail": str(exc)})
+        await websocket.close(code=1011)
+    except WebSocketDisconnect:
+        pass
+
+
+def _gallery_aois_from_labels(dataset_root: Path, poster: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """AOIs for a gallery poster, read from its current YOLO label file.
+
+    The AOI list embedded in the capture page was generated once and still has
+    boxes from before the labels were cleaned (negative or off-image
+    coordinates), so the label files are the source of truth.
+    """
+    width, height = int(poster.get("width") or 0), int(poster.get("height") or 0)
+    if width <= 0 or height <= 0:
+        return None
+    stem = Path(poster["name"]).stem
+    for split in ("train", "valid", "test"):
+        label_path = dataset_root / split / "labels" / f"{stem}.txt"
+        if label_path.is_file():
+            records = parse_yolo_labels(str(label_path), (height, width))
+            return [
+                {
+                    "label": r.class_name,
+                    "x1": max(0, min(width, r.x1)), "y1": max(0, min(height, r.y1)),
+                    "x2": max(0, min(width, r.x2)), "y2": max(0, min(height, r.y2)),
+                }
+                for r in records
+                if min(width, r.x2) - max(0, r.x1) > 1 and min(height, r.y2) - max(0, r.y1) > 1
+            ]
+    return None
+
+
+@app.get("/api/analyses")
+def list_analyses(limit: int = 30) -> dict[str, Any]:
+    return {"analyses": get_store().list(limit)}
+
+
+@app.get("/api/analyses/{analysis_id}")
+def get_analysis(analysis_id: str) -> dict[str, Any]:
+    found = get_store().get(analysis_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+    return found[0]
+
+
+@app.delete("/api/analyses/{analysis_id}")
+def delete_analysis(analysis_id: str) -> dict[str, bool]:
+    if not get_store().delete(analysis_id):
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+    return {"deleted": True}
+
+
+@app.get("/api/analyses/{analysis_id}/report.pdf")
+def analysis_report_pdf(analysis_id: str) -> Response:
+    found = get_store().get(analysis_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+    payload = found[0]
+    stem = Path(payload.get("filename") or "poster").stem[:40] or "poster"
+    return Response(
+        build_analysis_pdf(payload),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{stem}_pes_report.pdf"'},
+    )
 
 
 @app.post("/api/chat")
-def chat_turn(request: ChatRequest) -> dict[str, str]:
-    cached = _analyses.get(request.analysis_id)
-    if cached is None:
-        raise HTTPException(
-            status_code=404,
-            detail="That analysis is no longer in memory. Re-analyze the poster to continue.",
-        )
+def chat_turn(request: ChatRequest, http_request: Request) -> dict[str, str]:
+    _check_chat_rate(http_request.client.host if http_request.client else "local")
+    found = get_store().get(request.analysis_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="That analysis was not found. Re-analyze the poster to continue.")
+    payload, poster = found
 
     try:
         reply = chat.ask(
-            analysis=cached["payload"],
+            analysis=payload,
             history=request.history,
             user_message=request.message,
-            image_data_uri=cached["image_data_uri"],
+            image_data_uri=chat.encode_image_for_chat(poster) if poster is not None else None,
         )
     except chat.ChatConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -412,13 +630,11 @@ def chat_turn(request: ChatRequest) -> dict[str, str]:
     return {"reply": reply}
 
 
-def _remember_analysis(analysis_id: str, payload: dict[str, Any], image: np.ndarray) -> None:
-    _analyses[analysis_id] = {
-        "payload": payload,
-        "image_data_uri": chat.encode_image_for_chat(image),
-    }
-    while len(_analyses) > _MAX_CACHED_ANALYSES:
-        _analyses.popitem(last=False)
+def _remember_analysis(payload: dict[str, Any], image: np.ndarray) -> None:
+    try:
+        get_store().save(payload, image)
+    except Exception as exc:  # storage must never break an analysis
+        print(f"warning: could not store analysis {payload.get('analysis_id')}: {exc}")
 
 
 def _attention_percentages(scores: dict[str, float]) -> dict[str, float]:
@@ -447,6 +663,15 @@ def encode_gaze_heatmap(image: np.ndarray, points: list[tuple[int, int, float]])
 def decode_image(image_bytes: bytes) -> np.ndarray:
     data = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(data, cv2.IMREAD_COLOR)
+    if image is None or image.size == 0:
+        # Pillow covers formats some OpenCV builds lack (AVIF, some WebP/PNG variants).
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(image_bytes)) as pil_image:
+                image = cv2.cvtColor(np.array(pil_image.convert("RGB")), cv2.COLOR_RGB2BGR)
+        except Exception:
+            image = None
     if image is None or image.size == 0:
         raise HTTPException(status_code=400, detail="Could not decode uploaded image.")
     return image
