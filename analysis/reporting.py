@@ -1,35 +1,31 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List
 import json
+from typing import Any, Dict, List
+
+import numpy as np
 
 from analysis.aoi import AOIRecord
-from analysis.scoring import score_poster
-from analysis.attention import summarize_attention
+from analysis.attention import calculate_attention_percentages, summarize_attention
+from analysis.recommendations import build_recommendations
+from analysis.scoring import calculate_pes
 
 
 def build_structured_report(
-    records: List[AOIRecord], attention_scores: Dict[str, float]
+    records: List[AOIRecord],
+    attention_scores: Dict[str, float],
+    image: np.ndarray | None = None,
 ) -> Dict[str, Any]:
-    """Return a machine-friendly report dict with metrics and findings."""
-    attention_summary = summarize_attention(attention_scores)
-    percentages = attention_summary.get("percentages", {})
-
-    scores = score_poster(records, percentages)
-
-    findings: List[str] = []
-    if scores["overall_score"] < 50:
-        findings.append("Poster needs design improvements to improve attention and presence.")
-    else:
-        findings.append("Poster shows adequate attention and component presence.")
-
-    report = {
-        "summary": attention_summary,
-        "scores": scores,
-        "records": [r.to_dict() for r in records],
-        "findings": findings,
+    """Machine-friendly report: attention summary, PES v2 and ranked recommendations."""
+    summary = summarize_attention(attention_scores)
+    percentages = calculate_attention_percentages(attention_scores, records)
+    pes = calculate_pes(percentages, records, image)
+    return {
+        "summary": summary,
+        "pes": pes,
+        "recommendations": build_recommendations(pes, percentages),
+        "records": [record.to_dict() for record in records],
     }
-    return report
 
 
 def report_to_json(report: Dict[str, Any]) -> str:

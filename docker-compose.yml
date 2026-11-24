@@ -6,6 +6,12 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    volumes:
+      - analyses:/app/data
+      # Gaze-engine model downloads (ETH-XGaze checkpoint, MediaPipe face model).
+      - gaze-models:/root/.ptgaze
+      - hf-cache:/root/.cache/huggingface
     restart: unless-stopped
   prometheus:
     image: prom/prometheus:latest
@@ -14,3 +20,8 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     restart: unless-stopped
+
+volumes:
+  analyses:
+  gaze-models:
+  hf-cache:

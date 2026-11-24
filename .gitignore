@@ -53,3 +53,6 @@ records/
 
 # Generated YOLO cache files
 **/labels.cache
+
+# Local analysis history (SQLite) and model downloads
+data/analyses.sqlite3*

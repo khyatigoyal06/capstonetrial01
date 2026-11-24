@@ -16,14 +16,31 @@ processing_seconds = Histogram(
 )
 
 
-def _start_server(port: int = 8000) -> None:
-    # This call blocks, so run it in a background thread when needed.
-    start_http_server(port)
+_started = False
 
 
-def start_metrics_server(port: int = 8000) -> None:
-    thread = threading.Thread(target=_start_server, args=(port,), daemon=True)
-    thread.start()
+def start_metrics_server(port: int | None = None) -> bool:
+    """Start the Prometheus endpoint once per process.
+
+    Returns False (instead of crashing a background thread) when disabled with
+    METRICS_PORT=0 or when the port is taken, e.g. by a second worker or by
+    uvicorn's --reload process.
+    """
+    global _started
+    if _started:
+        return True
+    if port is None:
+        from config.settings import METRICS_PORT
+
+        port = METRICS_PORT
+    if not port:
+        return False
+    try:
+        start_http_server(port)  # serves from its own daemon thread
+    except OSError:
+        return False
+    _started = True
+    return True
 
 
 # Convenience context manager for timing

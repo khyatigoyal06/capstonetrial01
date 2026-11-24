@@ -5,9 +5,10 @@ captures. With no eye tracker in the loop we estimate that share from a visual
 saliency map instead of from box area, so that a small high-contrast CTA can
 out-score a large flat logo.
 
-Method: spectral-residual saliency (Hou & Zhang, CVPR 2007), implemented on
-numpy FFT because `cv2.saliency` lives in opencv-contrib, which this project
-does not depend on. The raw map is multiplied by a centre-bias prior, since
+Method: spectral-residual saliency (Hou & Zhang, CVPR 2007) on each CIE Lab
+channel, implemented on numpy FFT. It is fast and dependency-free but dated;
+validate it against measured gaze with tools/validate_saliency.py before
+relying on its numbers. The raw map is multiplied by a centre-bias prior, since
 viewers reliably fixate the middle of a poster first.
 
 Saliency mass is then assigned to AOIs with a single-owner rule (see
@@ -35,32 +36,43 @@ _CENTRE_SIGMA = 0.45
 _CENTRE_FLOOR = 0.25
 
 
+def _spectral_residual(channel: np.ndarray) -> np.ndarray:
+    """Spectral-residual saliency of one channel at _WORK_SIZE resolution."""
+    small = cv2.resize(channel, (_WORK_SIZE, _WORK_SIZE), interpolation=cv2.INTER_AREA).astype(np.float64)
+    spectrum = np.fft.fft2(small)
+    log_amplitude = np.log(np.abs(spectrum) + 1e-8)
+    phase = np.angle(spectrum)
+    # The "expected" log spectrum is the locally averaged one; whatever the
+    # image does *beyond* that average is the part that draws the eye.
+    residual = log_amplitude - cv2.blur(log_amplitude, (3, 3))
+    saliency = np.abs(np.fft.ifft2(np.exp(residual + 1j * phase))) ** 2
+    return cv2.GaussianBlur(saliency, (9, 9), 2.5)
+
+
 def compute_saliency_map(image: np.ndarray) -> np.ndarray:
-    """Return a per-pixel saliency map, same H×W as `image`, non-negative."""
+    """Return a per-pixel saliency map, same H x W as `image`, non-negative.
+
+    Colour images are processed per channel in CIE Lab (lightness plus the two
+    opponent-colour axes) and the normalised maps averaged, so a saturated red
+    or yellow item on a neutral background stands out even when its brightness
+    matches the background. Lightness keeps the largest weight.
+    """
     if image is None or image.size == 0:
         raise ValueError("Cannot compute saliency for an empty image.")
 
     height, width = image.shape[:2]
+    if image.ndim == 3:
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        maps, weights = [], (0.5, 0.25, 0.25)
+        for index in range(3):
+            channel_map = _spectral_residual(lab[:, :, index])
+            peak = float(channel_map.max())
+            maps.append(channel_map / peak if peak > 0 else channel_map)
+        saliency = sum(weight * channel_map for weight, channel_map in zip(weights, maps))
+    else:
+        saliency = _spectral_residual(image)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
-    small = cv2.resize(gray, (_WORK_SIZE, _WORK_SIZE), interpolation=cv2.INTER_AREA)
-    small = small.astype(np.float64)
-
-    spectrum = np.fft.fft2(small)
-    log_amplitude = np.log(np.abs(spectrum) + 1e-8)
-    phase = np.angle(spectrum)
-
-    # The "expected" log spectrum is the locally averaged one; whatever the
-    # image does *beyond* that average is the part that draws the eye.
-    averaged = cv2.blur(log_amplitude, (3, 3))
-    residual = log_amplitude - averaged
-
-    reconstructed = np.fft.ifft2(np.exp(residual + 1j * phase))
-    saliency = np.abs(reconstructed) ** 2
-
-    saliency = cv2.GaussianBlur(saliency, (9, 9), 2.5)
     saliency = cv2.resize(saliency, (width, height), interpolation=cv2.INTER_CUBIC)
-
     return np.clip(saliency, 0.0, None)
 
 

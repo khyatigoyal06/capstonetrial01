@@ -1,18 +1,31 @@
-opencv-python
-matplotlib
-pillow
-numpy
-pandas
-pytest
-streamlit
-prometheus-client
-playwright
-pytest-playwright
-reportlab
-ultralytics
-pyyaml
-fastapi
-httpx
-uvicorn
-python-multipart
-ptgaze
+# Runtime dependencies for the API server (versions verified together on
+# Windows / Python 3.11). Dev and legacy tools live in requirements-dev.txt.
+#
+# Note: ultralytics depends on opencv-python and mediapipe on
+# opencv-contrib-python; both provide `cv2`, so they are pinned to the SAME
+# version to keep that shared module consistent.
+
+fastapi==0.165.0
+uvicorn[standard]==0.54.0          # [standard] brings websockets for the live gaze stream
+python-multipart==0.0.34
+httpx==0.28.1
+pydantic==2.14.4
+pyyaml==6.0.3
+python-dotenv==1.2.4
+prometheus-client==0.26.0
+reportlab==5.1.0
+
+numpy==2.4.6
+opencv-python==5.1.0.95
+opencv-contrib-python==5.1.0.95
+pillow==13.0.0
+
+# Poster element detector
+ultralytics==8.4.216
+
+# Gaze engine: ETH-XGaze model, MediaPipe face landmarks, head pose + normalisation
+ptgaze==0.3.0
+torch==2.15.0
+torchvision==0.29.2
+timm==1.0.31
+mediapipe==1.2.3

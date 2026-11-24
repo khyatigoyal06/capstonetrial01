@@ -97,13 +97,9 @@ def test_calculate_pes_accepts_aoi_records(poster):
     pes = calculate_pes(percentages, records)
 
     assert 0 <= pes["score"] <= 100
-    assert set(pes["components"]) == {
-        "Product Attention",
-        "CTA Visibility",
-        "Headline Engagement",
-        "Attention Balance",
-        "Visual Hierarchy",
-    }
+    assert set(pes["components"]) == {"Attention Fit", "Visual Hierarchy", "Focus", "Completeness"}
+    pes_with_image = calculate_pes(percentages, records, poster)
+    assert "Readability" in pes_with_image["components"]
     assert pes["category"] == get_pes_category(pes["score"])
     assert isinstance(pes["insights"], list)
 

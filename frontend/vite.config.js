@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://127.0.0.1:8001",
+      // ws: true forwards the live gaze WebSocket (/api/gaze/stream).
+      "/api": { target: "http://127.0.0.1:8001", ws: true },
       "/Capstone.yolov8/train/images": "http://127.0.0.1:8001",
     },
   },

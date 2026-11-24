@@ -188,24 +188,37 @@ def aoi_records_to_legacy_boxes(records: list[AOIRecord]) -> list[tuple[str, int
     return [record.to_legacy_box() for record in records]
 
 
+# Distinct BGR colours per class, matching the capture page's AOI colours.
+AOI_COLORS_BGR = {
+    "Product": (246, 130, 59),
+    "Headline": (246, 92, 139),
+    "CTA": (11, 158, 245),
+    "Price": (129, 185, 16),
+    "logo": (153, 72, 236),
+}
+
+
 def draw_aoi_boxes(
     image: np.ndarray,
     records: list[AOIRecord],
 ) -> tuple[np.ndarray, list[tuple[str, int, int, int, int]]]:
-    """Draw AOI rectangles on a poster preview and return RGB image + legacy boxes."""
+    """Draw AOI rectangles with readable labels; return RGB image + legacy boxes."""
     preview = image.copy()
+    height, width = preview.shape[:2]
+    scale = max(0.5, min(1.4, max(height, width) / 1000))
+    thickness = max(2, int(round(2 * scale)))
 
     for record in records:
-        cv2.rectangle(preview, (record.x1, record.y1), (record.x2, record.y2), (0, 255, 0), 2)
-        cv2.putText(
-            preview,
-            record.class_name,
-            (record.x1, max(record.y1 - 10, 20)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 0, 0),
-            2,
-        )
+        colour = AOI_COLORS_BGR.get(record.class_name, (0, 200, 0))
+        cv2.rectangle(preview, (record.x1, record.y1), (record.x2, record.y2), colour, thickness)
+        text = f"{record.class_name} {record.confidence * 100:.0f}%" if record.confidence < 1 else record.class_name
+        (tw, th), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6 * scale, max(1, thickness - 1))
+        x = max(0, min(record.x1, width - tw - 8))
+        y = record.y1 - th - baseline - 6 if record.y1 - th - baseline - 6 >= 0 else record.y1
+        # Filled tag behind the text so labels stay readable on any poster.
+        cv2.rectangle(preview, (x, y), (x + tw + 8, y + th + baseline + 6), colour, -1)
+        cv2.putText(preview, text, (x + 4, y + th + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.6 * scale,
+                    (255, 255, 255), max(1, thickness - 1), cv2.LINE_AA)
 
     preview_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
     return preview_rgb, aoi_records_to_legacy_boxes(records)

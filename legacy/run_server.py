@@ -1,4 +1,5 @@
 import http.server
+from pathlib import Path
 import os
 import socketserver
 import subprocess
@@ -15,7 +16,7 @@ def start_streamlit():
         "-m",
         "streamlit",
         "run",
-        "app/app.py",
+        str(Path(__file__).resolve().parent / "streamlit_app" / "app.py"),
         "--server.port",
         "8502",
     ]

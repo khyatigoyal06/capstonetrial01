@@ -1,4 +1,9 @@
-# Standalone webcam gaze tracker
+# Standalone webcam gaze tracker (legacy)
+
+> **Superseded by `gaze_engine/`** (see the main README, "Eye tracking: the gaze engine").
+> This tracker maps iris-offset features to pixels with no head pose, so head movement after
+> calibration shows up as gaze error (about 400 px median measured). It is kept for reference and
+> as the browser's offline "legacy" fallback; do not use it for study data.
 
 This is an experimental prototype, independent of the poster app, FastAPI,
 React, YOLO and poster AOIs. Camera frames are processed on-device; MediaPipe's
@@ -16,7 +21,7 @@ available on this Mac and works with the tracker requirements. Use it in a
 virtual environment; do not install into the system interpreter.
 
 ```sh
-cd "/Users/khyatigoyal/Downloads/cap-new-feature-pr-ready 3/custom_eye_tracker"
+cd custom_eye_tracker
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip

@@ -1,19 +1,53 @@
-# Poster Effectiveness Score (PES) configuration
-# Weights must sum to 100 for interpretability.
+# Poster Effectiveness Score (PES) v2 configuration.
+#
+# PES = weighted mean of five 0-100 components. A component that cannot be
+# measured for a poster (e.g. Readability without text elements) is left out
+# and the remaining weights are rescaled, so scores stay on the same 0-100 scale.
+#
+# These weights and bands are design heuristics, not values fitted to sales
+# or click data. tools/validate_saliency.py and the gaze study let you check
+# the attention inputs against real viewers.
+
+pes_version: 2
 
 pes_weights:
-  Product Attention: 25
-  CTA Visibility: 20
-  Headline Engagement: 20
-  Attention Balance: 15
-  Visual Hierarchy: 20
+  Attention Fit: 30        # does each element get a healthy share of attention?
+  Visual Hierarchy: 20     # Product first, then message (Headline/CTA/Price), logo last
+  Focus: 15                # little attention lost to background, no single element hogging it
+  Completeness: 15         # are the key ad elements present at all?
+  Readability: 20          # text contrast (WCAG) and size
 
+# Healthy attention share (%) per element, and how much each element matters
+# within Attention Fit.
 ideal_attention_ranges:
   Product: [30, 45]
   Headline: [15, 30]
   CTA: [10, 20]
   Price: [5, 15]
   logo: [3, 10]
+
+element_importance:
+  Product: 0.35
+  Headline: 0.25
+  CTA: 0.25
+  Price: 0.10
+  logo: 0.05
+
+# Points each element contributes to Completeness when present (sum = 100).
+completeness_points:
+  Product: 35
+  Headline: 25
+  CTA: 25
+  logo: 10
+  Price: 5
+
+# Expected viewing order for Visual Hierarchy (lower = should be seen earlier).
+expected_rank:
+  Product: 1
+  Headline: 2
+  CTA: 2
+  Price: 3
+  logo: 4
 
 pes_categories:
   excellent: 80

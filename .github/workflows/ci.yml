@@ -2,40 +2,55 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install dependencies
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies (CPU PyTorch)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0 torchvision==0.29.2
+          pip install -r requirements-dev.txt
       - name: Run tests
-        run: |
-          python -m pytest -q
-  build-image:
+        env:
+          METRICS_PORT: "0"
+        run: python -m pytest -q
+
+  frontend:
     runs-on: ubuntu-latest
-    needs: test
     steps:
       - uses: actions/checkout@v4
-      - name: Build Docker image
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, frontend]
+    env:
+      # Secrets cannot be used directly in `if:`; expose a flag instead.
+      HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t capstone-poster:latest .
+      - name: Push image (only when Docker Hub secrets are configured, on main/master)
+        if: env.HAS_DOCKERHUB == 'true' && github.event_name == 'push'
         run: |
-          docker build -t capstone-poster:latest .
-      - name: Login to registry (optional)
-        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
-        run: |
-          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-      - name: Push image (optional)
-        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
-        run: |
-          docker tag capstone-poster:latest ${{ secrets.DOCKERHUB_USERNAME }}/capstone-poster:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/capstone-poster:latest
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker tag capstone-poster:latest "${{ secrets.DOCKERHUB_USERNAME }}/capstone-poster:latest"
+          docker push "${{ secrets.DOCKERHUB_USERNAME }}/capstone-poster:latest"

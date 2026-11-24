@@ -66,6 +66,24 @@ BACKGROUND_LABEL = "Background"
 
 RAW_DATA_DEFAULT_FIXATION_MS = 300
 
+# --- Detection ----------------------------------------------------------------
+DETECTION_CONFIDENCE = float(os.getenv("DETECTION_CONFIDENCE", "0.25"))
+# Same-class boxes overlapping more than this are treated as one element.
+DUPLICATE_IOU = float(os.getenv("DETECTION_DUPLICATE_IOU", "0.6"))
+
+# --- API limits ---------------------------------------------------------------
+MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "20"))
+CHAT_MAX_HISTORY_TURNS = int(os.getenv("CHAT_MAX_HISTORY_TURNS", "12"))
+CHAT_RATE_LIMIT_PER_MINUTE = int(os.getenv("CHAT_RATE_LIMIT_PER_MINUTE", "20"))
+
+# --- Storage ------------------------------------------------------------------
+# Analyses are kept in SQLite so chat, PDF reports and history survive restarts.
+ANALYSIS_DB_PATH = Path(os.getenv("ANALYSIS_DB_PATH", PROJECT_ROOT / "data" / "analyses.sqlite3"))
+ANALYSIS_DB_MAX_ROWS = int(os.getenv("ANALYSIS_DB_MAX_ROWS", "200"))
+
+# --- Monitoring -----------------------------------------------------------------
+METRICS_PORT = int(os.getenv("METRICS_PORT", "8000"))  # 0 disables the Prometheus endpoint
+
 # --- Groq chat (suggestion assistant) -------------------------------------
 # The key is read server-side only and is never sent to the browser.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
